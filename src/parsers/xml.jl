@@ -228,6 +228,15 @@ const XMLParser_optimized::Type = XMLParser # 不带参数类
 "纯翻译：纯粹地将AST直译成XML"
 const XMLParser_pure::Type = XMLParser{Dict} # 带参数类Dict
 
+"重载「字符串宏の快捷方式」:xml"
+Conversion.get_parser_from_flag(::Val{:xml})::TAbstractParser = XMLParser
+
+"重载「字符串宏の快捷方式」:xml_optimized"
+Conversion.get_parser_from_flag(::Val{:xml_optimized})::TAbstractParser = XMLParser_optimized
+
+"重载「字符串宏の快捷方式」:xml_puret"
+Conversion.get_parser_from_flag(::Val{:xml_pure})::TAbstractParser = XMLParser_pure
+
 const TXMLParser_optimized::Type = Type{XMLParser_optimized} # 仅一个Type
 const TXMLParser_pure::Type = Type{XMLParser_pure}
 
@@ -456,7 +465,7 @@ begin "解析の逻辑"
     """
     xml_pack(::TXMLParser_optimized, t::Atom)::XML.Node = XML.Node(
         XML.Element, # 类型：元素
-        typeof(t) |> string, # 词项类型⇒元素标签
+        Conversion.pack_type_string(t), # 词项类型⇒元素标签
         (name=string(t.name),), # 属性：name=名称（字符串）
     )
 
@@ -481,7 +490,7 @@ begin "解析の逻辑"
     """
     xml_pack(parser::TXMLParser_optimized, t::Statement)::XML.Node = XML.Node(
         XML.Element, # 类型：元素
-        typeof(t) |> string, # 词项类型⇒元素标签
+        Conversion.pack_type_string(t), # 词项类型⇒元素标签
         nothing, # 无属性
         nothing, # 无value
         XML.Node[
@@ -509,7 +518,7 @@ begin "解析の逻辑"
     """
     xml_pack(parser::TXMLParser_optimized, t::Union{ATermSet, AStatementSet})::XML.Node = XML.Node(
         XML.Element, # 类型：元素
-        typeof(t) |> string, # 词项类型⇒元素标签
+        Conversion.pack_type_string(t), # 词项类型⇒元素标签
         nothing, # 无属性
         nothing, # 无value
         [ # 子节点
@@ -538,7 +547,7 @@ begin "解析の逻辑"
     """
     xml_pack(parser::TXMLParser_optimized, t::TermImage)::XML.Node = XML.Node(
         XML.Element, # 类型：元素
-        typeof(t) |> string, # 词项类型⇒元素标签
+        Conversion.pack_type_string(t), # 词项类型⇒元素标签
         (relation_index=string(t.relation_index),), # relation_index属性：整数
         nothing, # 无value
         [ # 子节点
@@ -566,7 +575,7 @@ begin "解析の逻辑"
     """
     xml_pack(::TXMLParser_optimized, t::Truth)::XML.Node = XML.Node(
         XML.Element, # 类型：元素
-        typeof(t) |> string, # 词项类型⇒元素标签
+        Conversion.pack_type_string(t), # 词项类型⇒元素标签
         (f=string(t.f),c = string(t.c)), # 属性：f、c
     )
 
@@ -599,6 +608,7 @@ begin "解析の逻辑"
     例：对`StampBasic{Eternal}`
     - `StampBasic{Eternal} <: Stamp{Eternal}`提取出「时态」`Eternal`
     - `StampBasic{Eternal}.name.name == :StampBasic`提取出「母类名」
+    - 使用`nameof`获取「母类名」只支持DataType
     """
     function xml_pack(parser::TXMLParser_optimized, s::T)::XML.Node where {
         tense <: Tense, # 先有时态
@@ -612,7 +622,7 @@ begin "解析の逻辑"
         # 再利用里面的「子节点」构建节点
         XML.Node(
             XML.Element, # 类型：元素
-            typeof(s).name.name,
+            typeof(s).name.name, # ⚠未经过API的「类型⇒字符串」转换
             (tense=pack_type_string(tense),), # 属性：时态类型
             expr.args
         )

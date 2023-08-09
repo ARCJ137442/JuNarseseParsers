@@ -24,6 +24,9 @@ Conversion.parse_target_types(::TSParser) = S11N_PARSE_TARGETS
 "数据类型：字节流对象 Vector{UInt8}"
 Base.eltype(::TSParser)::Type = Bytes8
 
+"重载「字符串宏の快捷方式」:s11n"
+Conversion.get_parser_from_flag(::Val{:s11n})::TAbstractParser = S11nParser
+
 # 正式开始 #
 
 # 具体词项对接

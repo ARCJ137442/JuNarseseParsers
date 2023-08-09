@@ -65,6 +65,15 @@ const TJSONParser::Type = Type{<:JSONParser}
 const JSONParser_object::TJSONParser = JSONParser # 默认采用object格式
 const JSONParser_array::TJSONParser = JSONParser{Vector}
 
+"重载「字符串宏の快捷方式」:json"
+Conversion.get_parser_from_flag(::Val{:json})::TAbstractParser = JSONParser
+
+"重载「字符串宏の快捷方式」:json_array"
+Conversion.get_parser_from_flag(::Val{:json_array})::TAbstractParser = JSONParser_array
+
+"重载「字符串宏の快捷方式」:json_object"
+Conversion.get_parser_from_flag(::Val{:json_object})::TAbstractParser = JSONParser_object
+
 """
 定义「JSON转换」的「目标类型」
 - JSON字串↔词项/语句
