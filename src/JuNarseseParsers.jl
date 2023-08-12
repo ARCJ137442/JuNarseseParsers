@@ -25,4 +25,7 @@ include("parsers/json.jl")
 # 序列化
 include("parsers/serialization.jl")
 
+# Lerche(Lark)
+include("parsers/serialization.jl")
+
 end # module

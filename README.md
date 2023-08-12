@@ -13,3 +13,8 @@ JuNarseseParsers
     - **序列化**：对接Julia自带的序列化系统
 2. （相应地）使JuNarsese更轻量化、可扩展
     - 后者不再依赖`JSON`、`XML`、`Serialization`库
+
+## 参考
+
+- JuNarsese(数据结构支持): <https://github.com/ARCJ137442/JuNarsese.jl>
+- PyNARS(解析器文法): <https://github.com/bowen-xu/PyNARS>
