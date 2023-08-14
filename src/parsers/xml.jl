@@ -154,7 +154,7 @@ AST:
     :Truth
         1.0
         0.5
-    :Stamp{Present}
+    :StampBasic{Present}
         【保留特征头】
             :vect
         :Int
@@ -183,7 +183,7 @@ AST:
         <Float16>1.0<Float16>
         <Float16>0.5<Float16>
     </Truth16>
-    <结构转义标签 type="Stamp{Present}">
+    <结构转义标签 type="StampBasic{Present}">
         <保留类标签 head="vect"/>
         <Int>0<Int>
         <Int>0<Int>
@@ -206,12 +206,12 @@ AST:
         </ExtImage>
     </Inheriance>
     <Truth16 f="1.0", c="0.5"/>
-    <Stamp tense="Present">
+    <StampBasic tense="Present">
         <保留类标签 head="vect"/>
         <Int value="0">
         <Int value="0">
         <Int value="0">
-    </Stamp>
+    </StampBasic>
 </SentenceJudgement>
 ```
 """
@@ -304,6 +304,37 @@ Base.eltype(::TXMLParser)::Type = String
 begin "解析の逻辑"
 
     """
+    通用方法：获取一个标签内表示「类型」的字符串
+    - 无转义：标签本身
+    - 有转义：标签「type」属性
+    """
+    @inline parse_node_type_name(n::XML.Node, tag::String)::String = (
+        tag == XML_ESCAPE_TAG ? 
+        n.attributes["type"] : 
+        tag
+    )
+
+    "自动获取标签"
+    @inline parse_node_type_name(n::XML.Node)::String = parse_node_type_name(
+        n, n.tag
+    )
+
+    """
+    通用方法：用于从一个XML节点中提取数据类型（可以调用构造方法的）
+    - 默认提取标签
+    - 若有转义，提取「type」属性
+    - 无论是否在「特别解析通道」都可调用"""
+    @inline parse_node_type(n::XML.Node, eval_function::Function)::Type = parse_node_type(
+        n, n.tag, eval_function
+    )
+
+    "加速在已有tag的情况下"
+    @inline parse_node_type(n::XML.Node, tag::String, eval_function::Function)::Type = Conversion.parse_type(
+        parse_node_type_name(n, tag),
+        eval_function
+    )
+
+    """
     默认解析方法
     - 仅用于：
         - XML.Element
@@ -329,19 +360,14 @@ begin "解析の逻辑"
             return xml_parse_special(parser, Number, n)
         # 结构类型
         else
-            literal = (
-                tag == XML_ESCAPE_TAG ? 
-                n.attributes["type"] : 
-                tag
-            )
             # 字符串⇒类型
-            type = Conversion.parse_type(literal, eval_function) # 可能解析出错
+            type = parse_node_type(n, tag, eval_function) # 可能解析出错
             # 尝试「特别解析」：取捷径解析对象
             parse_special::Any = xml_parse_special(
                 parser, type, n
             )
             if parse_special isa XML.Node # 返回自身⇒继续
-                head = Symbol(literal)
+                head = Symbol(type) # 直接字符串化类型
                 args = isnothing(n.children) ? [] : n.children
             else
                 # 直接返回原对象
@@ -454,7 +480,7 @@ begin "解析の逻辑"
     特别解析@带优化：节点⇒原子词项
     """
     function xml_parse_special(::TXMLParser_optimized, ::Type{T}, n::XML.Node)::Term where {T <: Atom}
-        type::DataType = Conversion.parse_type(n.tag, Narsese.eval) # 获得类型
+        type::DataType = parse_node_type(n, Narsese.eval) # 获得类型
         name::Symbol = n.attributes["name"] |> Symbol
         return type(name) # 构造原子词项
     end
@@ -472,8 +498,9 @@ begin "解析の逻辑"
     """
     特别解析@带优化：节点⇒陈述
     """
-    function xml_parse_special(parser::TXMLParser_optimized, ::Type{T}, n::XML.Node)::Statement where {T <: Statement}
-        type::DataType = Conversion.parse_type(n.tag, Narsese.eval) # 获得类型
+    function xml_parse_special(parser::TXMLParser_optimized, ::Type{<:Statement}, n::XML.Node)::Statement
+        @show n.tag
+        type::DataType = parse_node_type(n, Narsese.eval) # 获得类型
         ϕ1::Term = xml_parse(parser, n[1])
         ϕ2::Term = xml_parse(parser, n[2])
         return type(ϕ1, ϕ2) # 构造原子词项
@@ -503,7 +530,7 @@ begin "解析の逻辑"
     特别解析@带优化：节点⇒词项集/陈述集(像除外)
     """
     function xml_parse_special(parser::TXMLParser_optimized, ::Type{T}, n::XML.Node)::Term where {T <: Union{ATermSet, AStatementSet}}
-        type::DataType = Conversion.parse_type(n.tag, Narsese.eval) # 获得类型
+        type::DataType = parse_node_type(n, Narsese.eval) # 获得类型
         args = isnothing(n.children) ? [] : n.children # n.children可能是nothing
         terms::Vector = [
             xml_parse(parser, child)::Term
@@ -531,7 +558,7 @@ begin "解析の逻辑"
     特别解析@带优化：节点⇒像
     """
     function xml_parse_special(parser::TXMLParser_optimized, ::Type{T}, n::XML.Node)::TermImage where {T <: TermImage}
-        type::DataType = Conversion.parse_type(n.tag, Narsese.eval) # 获得类型
+        type::DataType = parse_node_type(n, Narsese.eval) # 获得类型
         args = isnothing(n.children) ? [] : n.children
         terms::Vector = [
             xml_parse(parser, child)::Term
@@ -560,7 +587,7 @@ begin "解析の逻辑"
     特别解析@带优化：节点⇒真值
     """
     function xml_parse_special(::TXMLParser_optimized, ::Type{T}, n::XML.Node)::Truth where {T <: Truth}
-        type::DataType = Conversion.parse_type(n.tag, Narsese.eval) # 获得类型
+        type::DataType = parse_node_type(n, Narsese.eval) # 获得类型
         # 解析其中的f、c值：从类名中获得精度信息
         f_str::String, c_str::String = n.attributes["f"], n.attributes["c"]
         f_type::Type, c_type::Type = type.types # 获取所有类型参数（一定是两个参数，不受别名影响）
@@ -581,13 +608,18 @@ begin "解析の逻辑"
 
     """
     特别解析@带优化：节点⇒时间戳
+    - 【20230814 22:58:23】现在时间戳不一定依赖于「时态」了
+        - 故现在只适用于「基础时间戳」
     """
     function xml_parse_special(
         parser::TXMLParser_optimized, 
-        ::Type{T}, 
+        ::Type{<:Stamp}, 
         n::XML.Node
-        )::Stamp where {T <: Stamp}
-        type::Type = Conversion.parse_type(n.tag, Narsese.eval) # 获得根类型
+        )::Stamp
+        type::Type = parse_node_type(n, Narsese.eval) # 获得根类型
+        # 【20230814 23:02:33】现只适用于StampBasic
+        !(type <: StampBasic) && return n # 返回自身，表示「无法特别解析」
+        # 继续解析「基础时间戳」
         tense::Type{<:Tense} = Conversion.parse_type(n.attributes["tense"], Narsese.eval) # 获得类型参数
         # 构造：当结构类型
         args = isnothing(n.children) ? [] : n.children
@@ -601,19 +633,18 @@ begin "解析の逻辑"
     end
     
     """
-    预打包：时间戳⇒XML节点
+    预打包：基础时间戳⇒XML节点
     - 前提假定：此中Stamp的「类型参数」一定是实例所属类型的「类型参数」
-        - 亦即协议：`具体时间戳类{tense <: AbstractTense} <: AbstractStamp{tense}`
+        - 亦即协议：`具体时间戳类{tense <: AbstractTense} <: AbstractStamp`
     
     例：对`StampBasic{Eternal}`
-    - `StampBasic{Eternal} <: Stamp{Eternal}`提取出「时态」`Eternal`
+    - `StampBasic{Eternal} <: Stamp`提取出「时态」`Eternal`
     - `StampBasic{Eternal}.name.name == :StampBasic`提取出「母类名」
     - 使用`nameof`获取「母类名」只支持DataType
+
+    【20230814 23:00:01】现在只适用于基础时间戳
     """
-    function xml_pack(parser::TXMLParser_optimized, s::T)::XML.Node where {
-        tense <: Tense, # 先有时态
-        T <: Stamp{tense} # 然后通过「继承Stamp{时态}」断言，提取出「时态类型」
-        }
+    function xml_pack(parser::TXMLParser_optimized, s::StampBasic)::XML.Node
         # 先打包一层得「args全是Node的Expr」
         expr::Expr = Conversion.ast_pack(
             ASTParser, s, xml_pack,
@@ -623,7 +654,7 @@ begin "解析の逻辑"
         XML.Node(
             XML.Element, # 类型：元素
             typeof(s).name.name, # ⚠未经过API的「类型⇒字符串」转换
-            (tense=pack_type_string(tense),), # 属性：时态类型
+            (tense=pack_type_string(get_tense(s)),), # 属性：时态类型
             expr.args
         )
     end

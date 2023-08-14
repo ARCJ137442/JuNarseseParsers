@@ -26,6 +26,6 @@ include("parsers/json.jl")
 include("parsers/serialization.jl")
 
 # Lerche(Lark)
-include("parsers/serialization.jl")
+include("parsers/lark.jl")
 
 end # module
