@@ -6,6 +6,7 @@ JuNarseseParsers 入口模块
 module JuNarseseParsers
 
 using JuNarsese
+using JuNarsese.Util
 using JuNarsese.Conversion
 
 # 导入待修改符号

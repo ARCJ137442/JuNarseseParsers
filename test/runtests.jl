@@ -16,12 +16,12 @@ macro equal_test(
         @info "reconverted_terms@$($parser):"
         join(reconverted_terms, "\n") |> println
         # 比对相等
-        for (t1, t2) in zip(reconverted_terms, ($test_set).terms)
-            if t1 ≠ t2
-                dump.(($parser).([t1, t2]); maxdepth=typemax(Int))
-                @error "Not eq!" t1 t2
+        for (reconv, origin) in zip(reconverted_terms, ($test_set).terms)
+            if reconv ≠ origin
+                @error "Not eq!" reconv origin
+                dump.(($parser).([reconv, origin]); maxdepth=typemax(Int))
             end
-            @test t1 == t2 # 📌【20230806 15:24:11】此处引入额外参数会报错……引用上下文复杂
+            @test reconv == origin # 📌【20230806 15:24:11】此处引入额外参数会报错……引用上下文复杂
         end
         # 语句 #
         # 二次转换
@@ -32,15 +32,18 @@ macro equal_test(
         @info "converted_sentences@$($parser):" 
         join(converted_sentences, "\n") |> println
         # 比对相等
-        for (t1, t2) in zip(reconverted_sentences, ($test_set).sentences)
-            if t1 ≠ t2
-                dump.(($parser).([t1, t2]); maxdepth=typemax(Int))
-                @error "Not eq!" t1 t2
+        for (reconv, origin) in zip(reconverted_sentences, ($test_set).sentences)
+            if reconv ≠ origin
+                @error "$parser: Not eq!" reconv origin
+                dump.(($parser).([reconv, origin]); maxdepth=typemax(Int))
             end
-            @test t1 == t2 # 📌【20230806 15:24:11】此处引入额外参数会报错……引用上下文复杂
+            @test reconv == origin # 📌【20230806 15:24:11】此处引入额外参数会报错……引用上下文复杂
         end
     end |> esc # 在调用的上下文中解析
 end
+
+# 非Test测试：用于堆栈追踪
+@equal_test LarkParser_alpha test_set
 
 # XMLParser_optimized.(test_set.terms)
 # XMLParser_optimized.(XMLParser_optimized.(test_set.terms))
@@ -65,5 +68,9 @@ end
 
     @testset "S11nParser" begin
         @equal_test S11nParser test_set # 【20230808 10:46:20】似乎已经解决了「EOF Error」问题
+    end
+
+    @testset "LarkParser" begin
+        @equal_test LarkParser_alpha test_set
     end
 end

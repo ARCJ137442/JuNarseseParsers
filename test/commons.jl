@@ -14,7 +14,7 @@ if !isdefined(Main, :JuNarsese)
     using JuNarsese.Util # 特别using其中的「Util」
     using JuNarseseParsers
 end
-
+# LarkParser_alpha("<A --> +123>. :!123: %1.0;0.9%")
 if !isdefined(Main, :Test)
     using Test
     """
@@ -81,6 +81,7 @@ if !isdefined(Main, :Test)
         narsese"<SELF {-] good>! :|: "
         narsese"<<(*, A, B) --> (*, C, D)> ==> (&&, <A --> C>, <B --> D>)>@ %1.00;0.90%"
         narsese"<(*, A, B, C, D) --> R>? "
+        narsese"<BALL {-] left>. :!132:"
         nse"「我是墓地」。现在真值=1.0真0.5信"han
         nse"「「他是『爱因斯坦』」得「他似爱因斯坦」」"han
         nse"「（与，「凉白开是水」，「水是有毒的」）得「凉白开是有毒的」」将来真值=0.8真0.3信"han

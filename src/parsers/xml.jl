@@ -499,7 +499,7 @@ begin "解析の逻辑"
     特别解析@带优化：节点⇒陈述
     """
     function xml_parse_special(parser::TXMLParser_optimized, ::Type{<:Statement}, n::XML.Node)::Statement
-        @show n.tag
+        # @show n.tag
         type::DataType = parse_node_type(n, Narsese.eval) # 获得类型
         ϕ1::Term = xml_parse(parser, n[1])
         ϕ2::Term = xml_parse(parser, n[2])
@@ -655,7 +655,8 @@ begin "解析の逻辑"
             XML.Element, # 类型：元素
             typeof(s).name.name, # ⚠未经过API的「类型⇒字符串」转换
             (tense=pack_type_string(get_tense(s)),), # 属性：时态类型
-            expr.args
+            nothing, # 【20230816 0:34:48】这个是value，别填错了！
+            expr.args # 第五个参数才是children
         )
     end
 
