@@ -6,8 +6,6 @@ Lark解析器
 =#
 
 # 导入
-
-using JuNarsese.Narsese # 调用专门的Narsese库
 using Lerche
 
 # 导出
@@ -15,7 +13,6 @@ using Lerche
 export LarkParser
 export LarkParser_alpha
 
-# Lerche部分 #
 
 begin "Lerche部分"
     
@@ -225,7 +222,7 @@ begin "Lerche部分"
     end
 
     # 基础类型 #
-    @inline_rule number(t::NarseseTransformer, num_str) = JuNarsese.parse_default(num_str)
+    @inline_rule number(t::NarseseTransformer, num_str) = JuNarsese.parse_default_float(num_str)
 
     # 语句 #
     @rule judgement(t::NarseseTransformer, args) = form_sentence(SentenceJudgement, args)
@@ -486,7 +483,7 @@ begin "JuNarsese部分"
     Base.eltype(::LarkParser)::Type = String
 
     "重载「字符串宏の快捷方式」:lark"
-    Conversion.get_parser_from_flag(::Val{:lark})::TAbstractParser = LarkParser
+    Conversion.get_parser_from_flag(::Val{:lark})::TAbstractParser = LarkParser_alpha
 
     # 字符串显示
     @redirect_SRS parser::LarkParser parser.name
@@ -508,7 +505,7 @@ begin "JuNarsese部分"
 
     # 定义 #
 
-    LarkParser_alpha::LarkParser = LarkParser(
+    const LarkParser_alpha::LarkParser = LarkParser(
         "LarkParser_alpha",
         ORIGINAL_NARSESE_GRAMMAR,
         NarseseTransformer(),

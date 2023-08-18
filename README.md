@@ -13,11 +13,13 @@ JuNarseseParsers
       - **JSON**：数组/对象 两种模式（后者为默认）
       - **XML**：纯翻译/带优化 两种模式（后者为默认）
     - **序列化**：对接Julia自带的序列化系统
-    - 基于EBNF文法的[Lerche](https://github.com/jamesrhester/Lerche.jl)格式
-2. （相应地）使JuNarsese更轻量化、可扩展
+2. 在字符串解析器中，使用多种文法描述Narsese，对接多种外部解析器：
+    - 基于EBNF文法的[Lerche](https://github.com/jamesrhester/Lerche.jl)
+    - 基于PEG文法的[PikaParser](https://github.com/LCSB-BioCore/PikaParser.jl)
+3. （相应地）使JuNarsese更轻量化、可扩展
     - 后者不再依赖`JSON`、`XML`、`Serialization`库
 
 ## 参考
 
 - JuNarsese(数据结构支持): <https://github.com/ARCJ137442/JuNarsese.jl>
-- PyNARS(解析器文法): <https://github.com/bowen-xu/PyNARS>
+- PyNARS(Lark, 解析器文法): <https://github.com/bowen-xu/PyNARS>

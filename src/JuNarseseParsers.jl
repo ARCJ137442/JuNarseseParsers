@@ -6,7 +6,7 @@ JuNarseseParsers 入口模块
 module JuNarseseParsers
 
 using JuNarsese
-using JuNarsese.Util
+using JuNarsese.Util # 共用Util库
 using JuNarsese.Conversion
 
 # 导入待修改符号
@@ -28,5 +28,8 @@ include("parsers/serialization.jl")
 
 # Lerche(Lark)
 include("parsers/lark.jl")
+
+# Pika(PikaParser)
+include("parsers/pika.jl")
 
 end # module

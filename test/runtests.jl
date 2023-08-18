@@ -34,7 +34,7 @@ macro equal_test(
         # 比对相等
         for (reconv, origin) in zip(reconverted_sentences, ($test_set).sentences)
             if reconv ≠ origin
-                @error "$parser: Not eq!" reconv origin
+                @error "$($parser): Not eq!" reconv origin
                 dump.(($parser).([reconv, origin]); maxdepth=typemax(Int))
             end
             @test reconv == origin # 📌【20230806 15:24:11】此处引入额外参数会报错……引用上下文复杂
@@ -55,6 +55,10 @@ end
 # JSONParser_array.(JSONParser_array.(test_set.terms))
 
 @testset "JuNarseseParsers" begin
+
+    @testset "PikaParser" begin
+        @equal_test PikaParser_alpha test_set
+    end
 
     @testset "XMLParser" begin
         @equal_test XMLParser_optimized test_set
