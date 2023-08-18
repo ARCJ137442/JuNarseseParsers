@@ -335,6 +335,36 @@ begin "解析の逻辑"
     )
 
     """
+    通用方法：从「结构类型」中构建XML（元素）节点
+    - 用于确保「无论何时需要以『结构类型』封装对象，都可正确转义而非把特殊符号带进节点标签中」
+    """
+    function xml_form_struct(
+        type_name::String,
+        attributes::NamedTuple = NamedTuple(), # 默认是空的具名元组
+        children::Union{Vector, Nothing} = nothing, # 可空
+        )::XML.Node
+        # 转义的条件：类名包含特殊符号
+        isnothing(match(XML_ESCAPE_REGEX, type_name)) && return XML.Node(
+            XML.Element,
+            XML_ESCAPE_TAG,
+            merge(attributes, (type=type_name,)), # 合并具名元组（注意：不能使用`...`展开式）
+            nothing, # 无value
+            children,
+        )
+        # 否则无需转义
+        return XML.Node(
+            XML.Element,
+            type_name,
+            attributes,
+            nothing, # 无value
+            children,
+        )
+    end
+
+    "重载：适应「仅需children」的情况" # 仅name的情况留在上一个方法
+    @inline xml_form_struct(type_name::String, children::Union{Vector, Nothing}) = xml_form_struct(type_name, NamedTuple(), children)
+
+    """
     默认解析方法
     - 仅用于：
         - XML.Element
@@ -343,7 +373,7 @@ begin "解析の逻辑"
     function xml_parse(
         parser::TXMLParser, n::XML.Node,
         eval_function = Narsese.eval
-    )::Any
+        )::Any
         # 原生类型：字符串
         if n.nodetype == XML.Text
             return n.value
@@ -388,11 +418,8 @@ begin "解析の逻辑"
     """
     （面向Debug）预打包@Symbol：xml将Symbol解析成构造函数
     """
-    xml_pack(parser::TXMLParser, s::Symbol)::XML.Node = XML.Node(
-        XML.Element,
+    @inline xml_pack(parser::TXMLParser, s::Symbol)::XML.Node = xml_form_struct(
         "Symbol", 
-        nothing,
-        nothing,
         XML.Node[
             xml_pack(parser, string(s))
         ]
@@ -408,33 +435,18 @@ begin "解析の逻辑"
             parser, # 递归回调解析器
         )
 
-        local tag::Union{String,Symbol}
-        local attributes::Union{NamedTuple,Nothing}
-        local children::Vector{XML.Node}
         # 保留类型：此时是Expr(保留特征头, 表达式头, 表达式参数...)
-        if expr.head == Conversion.AST_PRESERVED_HEAD
-            tag = XML_PRESERVED_TAG # 保留类标签
-            attributes = (head=String(expr.args[1]),) # 获取第一个元素作「类名」（Symbol）
-            children = expr.args[2:end] # 从第二个开始
-        # 结构类型：此时是Expr(:类名, 表达式参数...)
-        else
-            tag = string(expr.head) # Symbol→string
-            # 转义的条件：类名包含特殊符号
-            if isnothing(match(XML_ESCAPE_REGEX, tag))
-                tag = XML_ESCAPE_TAG
-                attributes = (type=pack_type_string(v),) # 具名元组
-            else # 否则无需转义
-                attributes = nothing
-            end
-            children = expr.args
-        end
-        # 返回节点
-        return XML.Node(
+        expr.head == Conversion.AST_PRESERVED_HEAD && return XML.Node(
             XML.Element, # 类型：元素
-            tag,
-            attributes,
+            XML_PRESERVED_TAG, # 保留类标签
+            (head=String(expr.args[1]),), # 获取第一个元素作「类名」（Symbol）
             nothing, # 无value
-            children,
+            expr.args[2:end], # 从第二个开始
+        )
+        # 结构类型：此时是Expr(:类名, 表达式参数...)
+        return xml_form_struct(
+            string(expr.head), # Symbol→string
+            expr.args, # 表达式参数
         )
     end
 
@@ -442,20 +454,22 @@ begin "解析の逻辑"
     默认「特别解析」：返回节点自身
     - 亦针对「原生类型」
     """
-    xml_parse_special(::TXMLParser, ::Type, n::XML.Node)::XML.Node = n
+    @inline xml_parse_special(::TXMLParser, ::Type, n::XML.Node)::XML.Node = n
 
     """
     预打包：原生类型⇒XML节点：
     - 用于处理可以直接转换的原始类型数据
     - 最终会变成字符串
     """
-    xml_pack(::TXMLParser, val::XML_NATIVE_TYPES)::XML.Node =  XML.Node(val)
+    @inline xml_pack(::TXMLParser, val::XML_NATIVE_TYPES)::XML.Node = XML.Node(val)
 
     """
     特别解析@数值：节点⇒数值
+
+    【20230819 0:21:52】有可能是某个地方的常量，比如「STAMP_TIME_TYPE」（JuNarsese.Narsese.Sentences.STAMP_TIME_TYPE）
     """
-    xml_parse_special(::TXMLParser, ::Type{Number}, n::XML.Node) = Base.parse(
-        Conversion.parse_type(n.attributes["type"], Base.eval), 
+    @inline xml_parse_special(::TXMLParser, ::Type{Number}, n::XML.Node) = Base.parse(
+        Conversion.parse_type(n.attributes["type"], Narsese.eval), 
         n.attributes["value"]
     )
 
@@ -467,7 +481,7 @@ begin "解析の逻辑"
 
     【20230806 20:32:37】已知问题：对带有Rational的数字类型，parse会产生解析错误
     """
-    xml_pack(::TXMLParser, num::Number)::XML.Node = XML.Node(
+    @inline xml_pack(::TXMLParser, num::Number)::XML.Node = XML.Node(
         XML.Element,
         XML_NUMBER_TAG, # 数值打包
         ( # 两个属性：类型&字符串值
@@ -489,8 +503,7 @@ begin "解析の逻辑"
     预打包：原子词项⇒XML节点
     - 示例：`A` ⇒ `<Word name="A"/>`
     """
-    xml_pack(::TXMLParser_optimized, t::Atom)::XML.Node = XML.Node(
-        XML.Element, # 类型：元素
+    xml_pack(::TXMLParser_optimized, t::Atom)::XML.Node = xml_form_struct(
         Conversion.pack_type_string(t), # 词项类型⇒元素标签
         (name=string(t.name),), # 属性：name=名称（字符串）
     )
@@ -515,11 +528,8 @@ begin "解析の逻辑"
         </Implication>
     ```
     """
-    xml_pack(parser::TXMLParser_optimized, t::Statement)::XML.Node = XML.Node(
-        XML.Element, # 类型：元素
+    xml_pack(parser::TXMLParser_optimized, t::Statement)::XML.Node = xml_form_struct(
         Conversion.pack_type_string(t), # 词项类型⇒元素标签
-        nothing, # 无属性
-        nothing, # 无value
         XML.Node[
             xml_pack(parser, t.ϕ1) # 第一个词项
             xml_pack(parser, t.ϕ2) # 第二个词项
@@ -527,32 +537,31 @@ begin "解析の逻辑"
     )
 
     """
-    特别解析@带优化：节点⇒词项集/陈述集(像除外)
+    特别解析@带优化：节点⇒通用复合词项(像除外)
     """
-    function xml_parse_special(parser::TXMLParser_optimized, ::Type{T}, n::XML.Node)::Term where {T <: Union{ATermSet, AStatementSet}}
-        type::DataType = parse_node_type(n, Narsese.eval) # 获得类型
+    function xml_parse_special(parser::TXMLParser_optimized, ::Type{T}, n::XML.Node)::Term where {type <: ACompoundType, T <: ACompound{type}}
+        constructor::DataType = parse_node_type(n, Narsese.eval) # 获得类型
         args = isnothing(n.children) ? [] : n.children # n.children可能是nothing
         terms::Vector = [
             xml_parse(parser, child)::Term
             for child::XML.Node in args
         ] # 广播
-        return type(terms...) # 构造原子词项
+        return constructor(terms...) # 构造原子词项
     end
     
     """
-    预打包：词项集/陈述集(像除外)
+    预打包：通用复合词项(像除外)
     - 特点：逐一打包其元素terms
     """
-    xml_pack(parser::TXMLParser_optimized, t::Union{ATermSet, AStatementSet})::XML.Node = XML.Node(
-        XML.Element, # 类型：元素
-        Conversion.pack_type_string(t), # 词项类型⇒元素标签
-        nothing, # 无属性
-        nothing, # 无value
-        [ # 子节点
-            xml_pack(parser, term)::XML.Node
-            for term::Term in t.terms # 统一预处理
-        ]
-    )
+    @inline function xml_pack(parser::TXMLParser_optimized, t::ACompound{type})::XML.Node where {type <: AbstractCompoundType}
+        return xml_form_struct(
+            Conversion.pack_type_string(t), # 词项类型⇒元素标签
+            [ # 子节点
+                xml_pack(parser, term)::XML.Node
+                for term::Term in t.terms # 统一预处理
+            ]
+        )
+    end
 
     """
     特别解析@带优化：节点⇒像
@@ -572,11 +581,9 @@ begin "解析の逻辑"
     预打包：像
     - 唯一区别就是有「占位符位置」
     """
-    xml_pack(parser::TXMLParser_optimized, t::TermImage)::XML.Node = XML.Node(
-        XML.Element, # 类型：元素
+    @inline xml_pack(parser::TXMLParser_optimized, t::TermImage)::XML.Node = xml_form_struct(
         Conversion.pack_type_string(t), # 词项类型⇒元素标签
         (relation_index=string(t.relation_index),), # relation_index属性：整数
-        nothing, # 无value
         [ # 子节点
             xml_pack(parser, term)::XML.Node
             for term::Term in t.terms # 统一预处理
@@ -600,8 +607,7 @@ begin "解析の逻辑"
     预打包：真值⇒XML节点
     - 示例：`%1.0;0.5%` ⇒ `<Truth16 f="1.0", c="0.5"/>`
     """
-    xml_pack(::TXMLParser_optimized, t::Truth)::XML.Node = XML.Node(
-        XML.Element, # 类型：元素
+    @inline xml_pack(::TXMLParser_optimized, t::Truth)::XML.Node = xml_form_struct(
         Conversion.pack_type_string(t), # 词项类型⇒元素标签
         (f=string(t.f),c = string(t.c)), # 属性：f、c
     )
@@ -651,12 +657,10 @@ begin "解析の逻辑"
             parser, # 递归回调解析器
         )
         # 再利用里面的「子节点」构建节点
-        XML.Node(
-            XML.Element, # 类型：元素
-            typeof(s).name.name, # ⚠未经过API的「类型⇒字符串」转换
+        return xml_form_struct(
+            string(typeof(s).name.name), # ⚠未经过API的「类型⇒字符串」转换
             (tense=pack_type_string(get_tense(s)),), # 属性：时态类型
-            nothing, # 【20230816 0:34:48】这个是value，别填错了！
-            expr.args # 第五个参数才是children
+            expr.args
         )
     end
 
