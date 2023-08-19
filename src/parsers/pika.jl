@@ -365,8 +365,9 @@ begin "Pika部分"
         :statement_angle => (str, subvals) -> Statement{subvals[5]}(subvals[3], subvals[7]),
         # subvals结构：括弧 空白 **词项** 空白 **系词(陈述类型)** 空白 **词项** ...
         :statement_round => (str, subvals) -> Statement{subvals[5]}(subvals[3], subvals[7]),
+        # subvals结构：标识符 空白 括弧 空白 **参数列表** ...
         :statement_ocall => (str, subvals) -> Inheritance( # subvals结构：**标识符(操作名)** 空白 括弧 空白 **词项数组** 空白 **词项数组** ...
-            TermProduct(subvals[4]),
+            TermProduct(subvals[5]),
             Operator(subvals[1]),
         ),
         # 主系词
