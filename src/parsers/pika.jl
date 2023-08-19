@@ -302,10 +302,10 @@ begin "Pika部分"
         # :budget => (str, subvals) -> (@info "support of budget is still WIP!" str subvals), # JuNarsese.Budget(...),
         #= 语句 =#
         # 语句 subvals结构：**词项** 空白 **标点(构造器)** 空白 时间戳 空白 真值 空白
-        :sentence => (str, subvals) -> (@show subvals)[3](
+        :sentence => (str, subvals) -> subvals[3](
             subvals[1]; # 内含之词项
-            stamp = isnothing(@show subvals[5]) ? JuNarsese.StampBasic{Eternal}() : subvals[5],
-            truth = isnothing(@show subvals[7]) ? JuNarsese.default_precision_truth() : subvals[7], # 真值
+            stamp = isnothing(subvals[5]) ? JuNarsese.StampBasic{Eternal}() : subvals[5],
+            truth = isnothing(subvals[7]) ? JuNarsese.default_precision_truth() : subvals[7], # 真值
         ),
         # 标点→语句类型
         :punct_judgement => (str, subvals) -> JuNarsese.SentenceJudgement,
@@ -313,7 +313,7 @@ begin "Pika部分"
         :punct_goal      => (str, subvals) -> JuNarsese.SentenceGoal,
         :punct_quest     => (str, subvals) -> JuNarsese.SentenceQuest,
         # 真值 subvals结构：括弧 空白 **无符号数** 空白[分隔符 空白 **无符号数** 空白]+ 括弧 空白
-        :truth_valued => (str, subvals) -> JuNarsese.Truth((@show subvals)[3], subvals[5]), # 【20230818 23:52:38】不知为何第四个的空白符被省掉了。。。
+        :truth_valued => (str, subvals) -> JuNarsese.Truth(subvals[3], subvals[5]), # 【20230818 23:52:38】不知为何第四个的空白符被省掉了。。。
         :truth_default => (str, subvals) -> JuNarsese.default_precision_truth(), # 不知为何就是不起效：`P.epsilon`似乎没法直接识别
         # 固定时态时间戳：直接返回相应的「基础时间戳」
         :stamp_past    => (str, subvals) -> JuNarsese.StampBasic{Past}(),
@@ -642,7 +642,7 @@ end
 # 测试：字串→语法树
 
 # narsese = raw"<A --> B>. :|: %0;0%" # 【20230816 23:50:51】✅
-narsese = raw"<流浪地球 --> 小说>. %1.0;0.5%" # 【20230816 23:50:51】✅
+# narsese = raw"<流浪地球 --> 小说>. %1.0;0.5%" # 【20230816 23:50:51】✅
 # narsese = raw"<<^A --> #B> ==> <$B --> C>>. :|: %1.0;0.5%" # 【20230816 23:50:51】✅
 # narsese = raw"<{SELF} --> [good]>. :|: %0.0;0.5%" # 【20230816 23:50:51】✅
 # narsese = raw"<{苹果, 香蕉, 雪梨} --> 水果>. :!0: %1.0;0.9%" # 【20230816 23:51:28】✅
@@ -653,8 +653,4 @@ narsese = raw"<流浪地球 --> 小说>. %1.0;0.5%" # 【20230816 23:50:51】✅
 # 【20230817 0:08:06】↓终极挑战：成功✅
 # narsese = raw"<<(*, (&|, (&/, <A --> B>, <B --> C>, <C --> D>), (&|, <B --> C>, <C --> D>, <A --> B>), (||, <词项 --> ^操作>, <{A, B, C} --> D>)), (&&, <<[A, B, C] --> D> ==> (||, <A --> D>, <B --> D>, <C --> D>)>, <<(/, R, A, B, _, D) --> C> ==> <(*, A, B, C, D) --> R>>), <(\, A, _, <<(*, ?A, $B) --> ^C> <=> <#D <-> E>>, (-, (&, A, B, C), (|, A, B, C))) --> (/, <<(/, R, A, B, _, D) --> C> ==> <(*, A, B, C, D) --> R>>, _, B, (-, {词项, ?查询变量, #非独变量, ^操作, $独立变量}, [词项, ?查询变量, #非独变量, ^操作, $独立变量]))>, <<<[A, B, C] --> D> ==> (||, <A --> D>, <B --> D>, <C --> D>)> ==> <<(*, ?A, $B) --> ^C> <=> <#D <-> E>>>, (--, <{词项, ?查询变量, #非独变量, ^操作, $独立变量} --> [<(||, (&/, <A --> B>, <B --> C>, <C --> D>), (&|, <B --> C>, <C --> D>, <A --> B>)) ==> <A --> D>>, (&, A, B, C)]>)) --> (-, {词项, ?查询变量, #非独变量, ^操作, $独立变量}, [词项, ?查询变量, #非独变量, ^操作, $独立变量])> <=> <<(||, (&/, <A --> B>, <B --> C>, <C --> D>), (&|, <B --> C>, <C --> D>, <A --> B>)) ==> <A --> D>> ==> (&|, <<A --> B> <|> <B --> C>>, <A --> [B]>, <<B --> C> </> <A --> B>>, <<A --> B> =\> <B --> C>>, <<A --> B> =|> <B --> C>>, <<A --> B> </> <B --> C>>, <<A --> B> =/> <B --> C>>, <{A} --> [B]>, <{A} --> B>)>>. :!2147483647: %0.718281828;0.14159265%"
 
-@show PikaParser_alpha(narsese)
-@show PikaParser_alpha(raw"<A --> B>. :|:")
-@show PikaParser_alpha(raw"<A --> B>. :|: %0;0%")
-
-
+# @show PikaParser_alpha(narsese)
