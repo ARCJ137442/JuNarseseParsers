@@ -6,7 +6,7 @@ import PikaParser as P
 # 导出
 
 export PikaParser
-export PikaParser_alpha
+export PikaParser_alpha, PikaParser_ascii, PikaParser_latex, PikaParser_han
 
 
 begin "Pika部分"
@@ -30,10 +30,10 @@ begin "Pika部分"
     const P_many_seq::Function = P.many ∘ P.seq
     const P_tie_seq::Function = P.tie ∘ P.seq
 
-    "坑：「some grammar rules not reachable from starts」不允许冗余规则" # 这点现在已在
-    const NARSESE_RULES::Dict = Dict(
-        # 元：开头/忽略 #
-        :top => P.seq( # 顶层，支持删去包围的空白符
+    # 原解析器 #
+    const NARSESE_RULES_ALPHA::Dict = Dict(
+            # 元：开头/忽略 #
+            :top => P.seq( # 顶层，支持删去包围的空白符
             :ws, # 前导空白符
             :narsese, # 📌task尚不支持
             # :ws, # 后缀空白符(其它地方的代码已有)
@@ -68,7 +68,8 @@ begin "Pika部分"
         # 用于词项名
         :identifier => P.seq( # 与Julia变量名标准一致的标识符
             P.satisfy(Base.is_id_start_char), # 调用Julia内部识别变量名的方法✅
-            P.many(
+            P_many_seq(
+                P.not_followed_by(:copula), # 【20230820 23:43:23】系词是保留字，不能把系词吃了！
                 P.satisfy(Base.is_id_char), # 调用Julia内部识别变量名的方法✅
             )
         ),
@@ -280,13 +281,262 @@ begin "Pika部分"
         ),
     )
 
-    NARSESE_GRAMMAR = P.make_grammar(
-        [:top], # 入口
-        P.flatten(NARSESE_RULES, Char), # 扁平化
-    );
+    # 字符串解析器转译部分 #
+        "_txt_to_token: 在基于字符的解析器中，将字符串/字符解析为对应Token标识符（空字串⇒空串表达式）"
+        P_token(str::AbstractString)::P.Clause = isempty(str) ? P.epsilon : P.tokens(str)
+        P_token(chr::AbstractChar)::P.Clause = P.token(chr)
 
-    ""
-    const NARSESE_FOLDS::Dict = Dict(
+        generate_rule_from_string_parser(parser::JuNarsese.Conversion.StringParser)::Dict = Dict(
+            # 元：开头/忽略 #
+            :top => P.seq( # 顶层，支持删去包围的空白符
+                :ws, # 前导空白符
+                :narsese, # 📌task尚不支持
+                # :ws, # 后缀空白符(其它地方的代码已有)
+            ),
+            :narsese => P.first(
+                :task,
+                :sentence,
+                :term,
+            ),
+            # 基础数据类型 #
+            # 空白: 不限量个空白字符
+            :ws => P.epsilon, # 【20230820 23:00:37】不要再预设空白符了，这个「处理空白符」的任务已交给「预处理函数」
+            # 数字
+            :digit => P.satisfy(isdigit), # 直接传递不解析
+            :uint => P.some(:digit), # 【20230816 16:11:12】some：至少有一个
+            :unsigned_number => P.first(
+                P.seq( # `XXX[.XXX]`
+                    P.some(:digit), # 【20230816 16:31:36】many：有多个/没有
+                    P.first(
+                        P.seq( # `.XXXXXX`
+                            P.token('.'), 
+                            P.some(:digit)
+                        ), 
+                        P.epsilon # 或者为空
+                    ),
+                ),
+                P.seq( # `.XXX` (优先匹配长的)
+                    P.token('.'), 
+                    P.some(:digit),
+                ),
+            ),
+            # 用于词项名
+            :identifier => P.seq( # 与Julia变量名标准一致的标识符
+                P.satisfy(Base.is_id_start_char), # 调用Julia内部识别变量名的方法✅
+                P_many_seq(
+                    P.not_followed_by(:copula), # 【20230820 23:43:23】系词是保留字，不能把系词吃了！
+                    P.satisfy(Base.is_id_char), # 调用Julia内部识别变量名的方法✅
+                )
+            ),
+            # 用于分隔符
+            :compound_separator => P_token(parser.comma_d2t), # 纯分隔符，不加尾缀
+            # 任务 #
+            :task => P_prefix( # [预算值] 语句
+                # P_one(:budget), # ⚠【20230816 17:12:40】不允许放第一个的「前导空字符」搜索「First with non-terminal epsilon match」
+                :budget, # 可选前缀「预算值」
+                :sentence, # 语句
+            ),
+            :budget => P.seq(
+                P_token(parser.budget_brackets[1]), :ws,
+                :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
+                P_many_seq( # 具体多少个，留给后续限定
+                    P_token(parser.budget_separator), :ws,
+                    :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
+                ),
+                P_token(parser.budget_brackets[2]), :ws,
+            ),
+            # 语句 #
+            :sentence => P.seq( # 词项 标点 [时间戳] [真值] # TODO：是否可以直接在时间戳上加个候选项「:ws」以实现统一管理「默认值」？
+                :term, :ws, # 内含之词项，至于「不能用变量当语句中的词项」留给「构造方法の合法性检查」
+                :punctuation, :ws, # 标点，用于决定语句类型
+                :stamp, :ws, # 时间戳(可为空)
+                :truth, :ws, # 真值(可为空)
+            ),
+            :punctuation => P.first(
+                :punct_judgement => P_token(parser.punctuation_dict[PunctuationJudgement]),
+                :punct_question  => P_token(parser.punctuation_dict[PunctuationQuestion]),
+                :punct_goal      => P_token(parser.punctuation_dict[PunctuationGoal]),
+                :punct_quest     => P_token(parser.punctuation_dict[PunctuationQuest]),
+            ),
+            :truth => P.first( # 不直接使用
+                :truth_valued => P.seq(
+                    P_token(parser.truth_brackets[1]), :ws,
+                    :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
+                    P_many_seq( # 具体多少个，留给「构造方法の合法性检查」
+                        P_token(parser.truth_separator), :ws,
+                        :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
+                    ),
+                    P_token(parser.truth_brackets[2]),
+                ),
+                :truth_default => P.epsilon,
+            ),
+            :stamp => P.first( # 不允许多余空白
+                # 带时刻时间戳
+                :stamp_timed => P.seq(
+                    P_token(parser.timed_stamp_brackets[1]), # 序列
+                    :uint, # 无符号整数
+                    P_token(parser.timed_stamp_brackets[2]),
+                ),
+                # 固定时态时间戳
+                :stamp_past    => P_token(parser.tense_dict[Past]), # 过去时
+                :stamp_present => P_token(parser.tense_dict[Present]), # 现在时
+                :stamp_future  => P_token(parser.tense_dict[Future]), # 未来时
+                :stamp_default => P_token(parser.tense_dict[Eternal]), # 永恒
+            ),
+            # 词项 #
+            # 总领
+            :term => P.first( # 陈述、复合、原子
+                :statement, # 陈述作为词项
+                :compound, # 复合词项
+                :atom, # 原子词项
+            ),
+            # 原子
+            :atom => P.first(
+                :i_var    => P.seq(P_token(parser.atom_prefixes[IVar]), :identifier),
+                :d_var    => P.seq(P_token(parser.atom_prefixes[DVar]), :identifier),
+                :q_var    => P.seq(P_token(parser.atom_prefixes[QVar]), :identifier),
+                :operator => P.seq(P_token(parser.atom_prefixes[Operator]), :identifier),
+                :interval => P.seq(P_token(parser.atom_prefixes[Interval]), :uint), # 区间`+非负整数`
+                # 像占位符：全下划线
+                :placeholder => P_token(parser.atom_prefixes[PlaceHolder]), # 新的「像占位符」
+                :word => P.seq(:identifier), # 单序列
+            ),
+            # 复合
+            :compound_connector => P.first(
+                # 一元算符
+                :compound_connector_unary => P.first(
+                    :negation => P_token(parser.compound_symbols[Negation]),
+                ),
+                # 二元/多元运算符（都支持`A * B`的形式）
+                :compound_connector_multi => P.first(
+                    :ext_difference   => P_token(parser.compound_symbols[ExtDiff]),
+                    :int_difference   => P_token(parser.compound_symbols[IntDiff]),
+                    # 多元运算符
+                    :conjunction      => P_token(parser.compound_symbols[Conjunction]), # 字符多的比少的优先！避免「被提前捞走」产生多余字符引起的「token重复谬误」
+                    :disjunction      => P_token(parser.compound_symbols[Disjunction]),
+                    :par_conjunction  => P_token(parser.compound_symbols[ParConjunction]),
+                    :seq_conjunction  => P_token(parser.compound_symbols[SeqConjunction]),
+                    :product          => P_token(parser.compound_symbols[TermProduct]),
+                    :ext_intersection => P_token(parser.compound_symbols[ExtIntersection]),
+                    :int_intersection => P_token(parser.compound_symbols[IntIntersection]),
+                    # :rev_conjunction => P_token(parser.compound_symbols[RevConjunction]), # 为了对称🤷
+                ),
+            ),
+            # 刻画形如`词项, 词项, ..., 词项`的**内联**语法
+            :inner_compound => P_tie_seq( # 📝此处的「tie」相当于Lark中的「内联」与Julia中的「@inline」，会把解析出的参数组展开到被包含的地方，且支持同时匹配多个
+                :term, # 不允许空集存在
+                P_many_seq( # 任意多词项
+                    :ws, 
+                    :compound_separator, :ws,
+                    P.first(:placeholder, :term),
+                ), # 无尾缀空白符
+            ),
+            # 相当于「像占位符」只在「像の语法」中有定义
+            :inner_compound_with_placeholder => P_tie_seq( # 📝此处的「tie」相当于Lark中的「内联」与Julia中的「@inline」，会把解析出的参数组展开到被包含的地方，且支持同时匹配多个
+                P.first(:placeholder, :term), # 允许像占位符定义(必须优先，不然作词项名)
+                P_many_seq(
+                    :ws, 
+                    :compound_separator, :ws,
+                    P.first(:placeholder, :term), # 允许像占位符定义(必须优先，不然作词项名)
+                ), # 无尾缀空白符
+            ),
+            :compound => P.first( # 复合词项
+                # 外延集
+                :ext_set => P.seq(
+                    P_token(parser.compound_brackets[ExtSet][1]), :ws,
+                    :inner_compound, :ws, # 不允许空集存在
+                    P_token(parser.compound_brackets[ExtSet][2]), :ws,
+                ),
+                # 内涵集
+                :int_set => P.seq(
+                    P_token(parser.compound_brackets[IntSet][1]), :ws,
+                    :inner_compound, :ws, # 不允许空集存在
+                    P_token(parser.compound_brackets[IntSet][2]), :ws,
+                ),
+                # 外延像
+                :ext_image => P.seq(
+                    P_token(parser.compound_brackets[Compound][1]), :ws,
+                    P_token(parser.compound_symbols[ExtImage]), :ws,
+                    :compound_separator, :ws,
+                    :inner_compound_with_placeholder, :ws,
+                    P_token(parser.compound_brackets[Compound][2]), :ws,
+                ),
+                # 内涵像
+                :int_image => P.seq(
+                    P_token(parser.compound_brackets[Compound][1]), :ws,
+                    P_token(parser.compound_symbols[IntImage]), :ws,
+                    :compound_separator, :ws,
+                    :inner_compound_with_placeholder, :ws,
+                    P_token(parser.compound_brackets[Compound][2]), :ws,
+                ),
+                # `一元连接符 词项`的形式
+                :compound_prefix_unary => P.seq(
+                    :compound_connector_unary, :ws,
+                    :term, :ws,
+                ),
+                # 正常的`(连接符, 词项...)`形式
+                :compound_prefix => P.seq(
+                    P_token(parser.compound_brackets[Compound][1]), :ws,
+                    :compound_connector, :ws,
+                    :compound_separator, :ws,
+                    :inner_compound, :ws,
+                    P_token(parser.compound_brackets[Compound][2]), :ws,
+                ),
+                # 「无连接符⇒默认乘积`*`」的`(词项...)` => `(*, 词项...)` 形式
+                :compound_no_prefix => P.seq(
+                    P_token(parser.compound_brackets[Compound][1]), :ws,
+                    :inner_compound, :ws,
+                    P_token(parser.compound_brackets[Compound][2]), :ws,
+                ),
+            ),
+            # 陈述
+            :statement => P.first(
+                # 正常的「尖括号」形式：`<term copula term>`
+                :statement_angle => P.seq(
+                    P_token(parser.compound_brackets[Statement][1]), :ws,
+                    :term, :ws,
+                    :copula, :ws, # 只实现一般形式，合法性限定留给「构造方法の合法性检查」
+                    :term, :ws,
+                    P_token(parser.compound_brackets[Statement][2]), :ws,
+                ),
+                # 「圆括号」形式（仿NARS-Python）：`(term copula term)`
+                :statement_round => P.seq(
+                    P_token(parser.compound_brackets[Compound][1]), :ws,
+                    :term, :ws,
+                    :copula, :ws, # 只实现一般形式，合法性限定留给「构造方法の合法性检查」
+                    :term, :ws,
+                    P_token(parser.compound_brackets[Compound][2]), :ws,
+                ),
+                # 类似「函数调用」的`操作(词项...)` => `(*, ⇑操作, 词项...)` 形式
+                :statement_ocall => P.seq(
+                    :identifier, :ws,
+                    P_token(parser.compound_brackets[Compound][1]), :ws,
+                    :inner_compound, :ws,
+                    P_token(parser.compound_brackets[Compound][2]), :ws,
+                ),
+            ),
+            :copula => P.first(
+                # 主系词
+                :inheritance               => P_token(parser.copula_dict[STInheritance]),
+                :similarity                => P_token(parser.copula_dict[STSimilarity]),
+                :implication               => P_token(parser.copula_dict[STImplication]),
+                :equivalence               => P_token(parser.copula_dict[STEquivalence]),
+                # 副系词
+                :instance                  => P_token(parser.copula_dict[STInstance]),
+                :property                  => P_token(parser.copula_dict[STProperty]),
+                :instance_property          => P_token(parser.copula_dict[STInstanceProperty]),
+                # 时序蕴含/等价
+                :predictive_implication        => P_token(parser.copula_dict[STImplicationPredictive]),
+                :concurrent_implication        => P_token(parser.copula_dict[STImplicationConcurrent]),
+                :retrospective_implication     => P_token(parser.copula_dict[STImplicationRetrospective]),
+                :predictive_equivalence        => P_token(parser.copula_dict[STEquivalencePredictive]),
+                :concurrent_equivalence        => P_token(parser.copula_dict[STEquivalenceConcurrent]),
+                :retrospective_equivalence     => P_token(parser.copula_dict[STEquivalenceRetrospective]), # 此「重定向行为」留给「数据类型构造」阶段，最大化减少语法复杂度/非对称性
+            ),
+        )
+
+    "默认的语法转换器"
+    const NARSESE_DEFAULT_FOLDS::Dict = Dict(
         #= 基础数据类型 =#
         # 空值直接返回第一个
         :ws         => (str, subvals) -> nothing,
@@ -480,6 +730,12 @@ begin "JuNarsese部分"
         stringify_func::Function
 
         """
+        字串预处理函数
+        - 对接原生字符串转换器中的「预处理」函数
+        """
+        preprocess_func::Function
+
+        """
         与new方法一致，不过`default_fold`是可选的
         """
         function PikaParser(
@@ -488,7 +744,8 @@ begin "JuNarsese部分"
             grammar::P.Grammar,
             folds::Dict,
             stringify_func::Function;
-            default_fold::Function = default_fold
+            default_fold::Function = default_fold,
+            preprocess_func::Function = identity, # 默认不作处理
             )
             new(
                 name,
@@ -498,6 +755,7 @@ begin "JuNarsese部分"
                 start,
                 default_fold,
                 stringify_func,
+                preprocess_func,
             )
         end
 
@@ -515,7 +773,8 @@ begin "JuNarsese部分"
             folds::Dict,
             stringify_func::Function;
             start::Symbol = :top,
-            default_fold::Function = default_fold
+            default_fold::Function = default_fold,
+            preprocess_func::Function = identity, # 默认不作处理
             )
             new(
                 name,
@@ -528,6 +787,7 @@ begin "JuNarsese部分"
                 start,
                 default_fold,
                 stringify_func,
+                preprocess_func,
             )
         end
 
@@ -544,6 +804,7 @@ begin "JuNarsese部分"
             args...; # 提供给「字符串打包器」的额外参数
             start::Symbol = :top,
             default_fold::Function = default_fold,
+            preprocess_func::Function = identity, # 默认不作处理
             )
             PikaParser(
                 name,
@@ -551,12 +812,13 @@ begin "JuNarsese部分"
                 folds,
                 object -> Conversion.narsese2data(stringify_parser, object, args...);
                 start = start,
-                default_fold = default_fold
+                default_fold = default_fold,
+                preprocess_func = preprocess_func,
             )
         end
 
         """
-        （WIP）从字符串解析器中导入
+        从字符串解析器中导入
         1. 根据内容自动生成语法
         2. 自动生成转换器
         3. 内联字符串解析器
@@ -564,20 +826,25 @@ begin "JuNarsese部分"
         """
         function PikaParser(
             name::String,
-            parser::Conversion.StringParser
+            parser::Conversion.StringParser,
+            folds::Dict,
+            args...; # 提供给「字符串打包器」的额外参数
+            start::Symbol = :top,
+            default_fold::Function = default_fold,
             )
-            # 1. 根据内容自动生成语法
-
-
-            # 2. 自动生成转换器
-
-
-            # 3. 内联字符串解析器
-
-
-            # 4. 跳转到第一个构造函数
-
-
+            # 直接构建解析器
+            PikaParser(
+                name,
+                generate_rule_from_string_parser(
+                    parser # 根据内容自动生成语法
+                ),
+                folds,
+                parser,
+                args...;
+                start = start,
+                default_fold = default_fold,
+                preprocess_func = parser.preprocess, # 引入字串解析器的预处理函数
+            )
         end
 
     end
@@ -603,13 +870,16 @@ begin "JuNarsese部分"
     begin "具体转换实现"
         
         "字符串⇒目标对象"
-        @inline function JuNarsese.data2narsese(parser::PikaParser, ::Type, string::AbstractString)::PIKA_PARSE_TARGETS
+        @inline function JuNarsese.data2narsese(parser::PikaParser, ::Type, narsese::AbstractString)::PIKA_PARSE_TARGETS
+
+            # 预处理
+            string::String = parser.preprocess_func(narsese)
 
             state::P.ParserState = P.parse(parser.grammar, string)
 
             match::Union{Integer, Nothing} = P.find_match_at!(state, parser.start, 1)
             
-            (isnothing(match) || match < 1) && error("解析失败！match = $match")
+            (isnothing(match) || match < 1) && error("$parser: 解析「$narsese($string)」失败！match = $match")
 
             return P.traverse_match(
                 state, match;
@@ -630,28 +900,37 @@ begin "JuNarsese部分"
 
     # 定义 #
 
+    "初代版本α"
     const PikaParser_alpha::PikaParser = PikaParser(
         "PikaParser_alpha",
-        NARSESE_RULES,
-        NARSESE_FOLDS,
+        NARSESE_RULES_ALPHA,
+        NARSESE_DEFAULT_FOLDS,
         Conversion.StringParser_ascii;
         start = :top
     )
 
+    "借用原生字符串解析器"
+    const PikaParser_ascii::PikaParser = PikaParser(
+        "PikaParser_ascii",
+        Conversion.StringParser_ascii,
+        NARSESE_DEFAULT_FOLDS;
+        start = :top
+    )
+
+    "借用原生LaTeX解析器"
+    const PikaParser_latex::PikaParser = PikaParser(
+        "PikaParser_latex",
+        Conversion.StringParser_latex,
+        NARSESE_DEFAULT_FOLDS;
+        start = :top
+    )
+
+    "借用原生漢文解析器"
+    const PikaParser_han::PikaParser = PikaParser(
+        "PikaParser_han",
+        Conversion.StringParser_han,
+        NARSESE_DEFAULT_FOLDS;
+        start = :top
+    )
+
 end
-
-# 测试：字串→语法树
-
-# narsese = raw"<A --> B>. :|: %0;0%" # 【20230816 23:50:51】✅
-# narsese = raw"<流浪地球 --> 小说>. %1.0;0.5%" # 【20230816 23:50:51】✅
-# narsese = raw"<<^A --> #B> ==> <$B --> C>>. :|: %1.0;0.5%" # 【20230816 23:50:51】✅
-# narsese = raw"<{SELF} --> [good]>. :|: %0.0;0.5%" # 【20230816 23:50:51】✅
-# narsese = raw"<{苹果, 香蕉, 雪梨} --> 水果>. :!0: %1.0;0.9%" # 【20230816 23:51:28】✅
-# narsese = raw"(&, A, B)" # 【20230816 23:56:48】✅
-# narsese = raw"(&&, <{苹果, 香蕉, 雪梨} --> 水果>, <水果 --> [好吃]>). :!0: %1.0;0.9%" # 【20230817 0:00:15】✅
-# narsese = raw"<(*, A, $B, #C, +137) --> ^D>" # 【20230817 0:02:43】✅
-# narsese = raw"(/, _, A, B)" # 【20230817 0:07:51】✅
-# 【20230817 0:08:06】↓终极挑战：成功✅
-# narsese = raw"<<(*, (&|, (&/, <A --> B>, <B --> C>, <C --> D>), (&|, <B --> C>, <C --> D>, <A --> B>), (||, <词项 --> ^操作>, <{A, B, C} --> D>)), (&&, <<[A, B, C] --> D> ==> (||, <A --> D>, <B --> D>, <C --> D>)>, <<(/, R, A, B, _, D) --> C> ==> <(*, A, B, C, D) --> R>>), <(\, A, _, <<(*, ?A, $B) --> ^C> <=> <#D <-> E>>, (-, (&, A, B, C), (|, A, B, C))) --> (/, <<(/, R, A, B, _, D) --> C> ==> <(*, A, B, C, D) --> R>>, _, B, (-, {词项, ?查询变量, #非独变量, ^操作, $独立变量}, [词项, ?查询变量, #非独变量, ^操作, $独立变量]))>, <<<[A, B, C] --> D> ==> (||, <A --> D>, <B --> D>, <C --> D>)> ==> <<(*, ?A, $B) --> ^C> <=> <#D <-> E>>>, (--, <{词项, ?查询变量, #非独变量, ^操作, $独立变量} --> [<(||, (&/, <A --> B>, <B --> C>, <C --> D>), (&|, <B --> C>, <C --> D>, <A --> B>)) ==> <A --> D>>, (&, A, B, C)]>)) --> (-, {词项, ?查询变量, #非独变量, ^操作, $独立变量}, [词项, ?查询变量, #非独变量, ^操作, $独立变量])> <=> <<(||, (&/, <A --> B>, <B --> C>, <C --> D>), (&|, <B --> C>, <C --> D>, <A --> B>)) ==> <A --> D>> ==> (&|, <<A --> B> <|> <B --> C>>, <A --> [B]>, <<B --> C> </> <A --> B>>, <<A --> B> =\> <B --> C>>, <<A --> B> =|> <B --> C>>, <<A --> B> </> <B --> C>>, <<A --> B> =/> <B --> C>>, <{A} --> [B]>, <{A} --> B>)>>. :!2147483647: %0.718281828;0.14159265%"
-
-# @show PikaParser_alpha(narsese)
