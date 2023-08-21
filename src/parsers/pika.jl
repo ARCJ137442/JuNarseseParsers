@@ -1,5 +1,3 @@
-
-
 # 导入
 import PikaParser as P
 
@@ -235,22 +233,25 @@ begin "Pika部分"
                 P.token(')'), :ws,
             ),
         ),
+        # 刻画内部陈述：词项 系词(陈述类型) 词项
+        :inner_statement => P.seq(
+            :term, :ws,
+            :copula, :ws, # 只实现一般形式，合法性限定留给「构造方法の合法性检查」
+            :term, :ws,
+        ),
         # 陈述
         :statement => P.first(
             # 正常的「尖括号」形式：`<term copula term>`
             :statement_angle => P.seq(
                 P.token('<'), :ws,
-                :term, :ws,
-                :copula, :ws, # 只实现一般形式，合法性限定留给「构造方法の合法性检查」
-                :term, :ws,
+                parser.compound_brackets[Compound][1]
+                :inner_statement,
                 P.token('>'), :ws,
             ),
             # 「圆括号」形式（仿NARS-Python）：`(term copula term)`
             :statement_round => P.seq(
                 P.token('('), :ws,
-                :term, :ws,
-                :copula, :ws, # 只实现一般形式，合法性限定留给「构造方法の合法性检查」
-                :term, :ws,
+                :inner_statement,
                 P.token(')'), :ws,
             ),
             # 类似「函数调用」的`操作(词项...)` => `(*, ⇑操作, 词项...)` 形式
@@ -259,6 +260,16 @@ begin "Pika部分"
                 P.token('('), :ws,
                 :inner_compound, :ws,
                 P.token(')'), :ws,
+            ),
+            # 🆕简略的「无括号」形式：`term copula term`
+            :statement_inline => P.seq(
+                P.not_followed_by( # 不能在识别到前面的情况时，再搞一个嵌套「<<A-->B>>」出来
+                    P.first(
+                        P.token('('),
+                        P.token('<'),
+                    )
+                ),
+                :inner_statement,
             ),
         ),
         :copula => P.first(
@@ -489,22 +500,24 @@ begin "Pika部分"
                     P_token(parser.compound_brackets[Compound][2]), :ws,
                 ),
             ),
+            # 刻画内部陈述：词项 系词(陈述类型) 词项
+            :inner_statement => P.seq(
+                :term, :ws,
+                :copula, :ws, # 只实现一般形式，合法性限定留给「构造方法の合法性检查」
+                :term, :ws,
+            ),
             # 陈述
             :statement => P.first(
                 # 正常的「尖括号」形式：`<term copula term>`
                 :statement_angle => P.seq(
                     P_token(parser.compound_brackets[Statement][1]), :ws,
-                    :term, :ws,
-                    :copula, :ws, # 只实现一般形式，合法性限定留给「构造方法の合法性检查」
-                    :term, :ws,
+                    :inner_statement,
                     P_token(parser.compound_brackets[Statement][2]), :ws,
                 ),
                 # 「圆括号」形式（仿NARS-Python）：`(term copula term)`
                 :statement_round => P.seq(
                     P_token(parser.compound_brackets[Compound][1]), :ws,
-                    :term, :ws,
-                    :copula, :ws, # 只实现一般形式，合法性限定留给「构造方法の合法性检查」
-                    :term, :ws,
+                    :inner_statement,
                     P_token(parser.compound_brackets[Compound][2]), :ws,
                 ),
                 # 类似「函数调用」的`操作(词项...)` => `(*, ⇑操作, 词项...)` 形式
@@ -513,6 +526,16 @@ begin "Pika部分"
                     P_token(parser.compound_brackets[Compound][1]), :ws,
                     :inner_compound, :ws,
                     P_token(parser.compound_brackets[Compound][2]), :ws,
+                ),
+                # 🆕简略的「无括号」形式：`term copula term`
+                :statement_inline => P.seq(
+                    P.not_followed_by( # 不能在识别到前面的情况时，再搞一个嵌套「<<A-->B>>」出来
+                        P.first(
+                            P_token(parser.compound_brackets[Compound][1]),
+                            P_token(parser.compound_brackets[Statement][1]),
+                        )
+                    ),
+                    :inner_statement,
                 ),
             ),
             :copula => P.first(
@@ -611,15 +634,19 @@ begin "Pika部分"
         :compound_no_prefix    => (str, subvals) -> TermProduct(subvals[3]), # subvals结构：括弧 空白 词项数组 ...
         # 陈述 #
         # 本体
-        # subvals结构：括弧 空白 **词项** 空白 **系词(陈述类型)** 空白 **词项** ...
-        :statement_angle => (str, subvals) -> Statement{subvals[5]}(subvals[3], subvals[7]),
-        # subvals结构：括弧 空白 **词项** 空白 **系词(陈述类型)** 空白 **词项** ...
-        :statement_round => (str, subvals) -> Statement{subvals[5]}(subvals[3], subvals[7]),
+        # subvals结构：**词项** 空白 **系词(陈述类型)** 空白 **词项** ...
+        :inner_statement => (str, subvals) -> Statement{subvals[3]}(subvals[1], subvals[5]),
+        # subvals结构：括弧 空白 **内陈述(陈述)** ...
+        :statement_angle => (str, subvals) -> subvals[3],
+        # subvals结构：括弧 空白 **内陈述(陈述)** ...
+        :statement_round => (str, subvals) -> subvals[3],
         # subvals结构：标识符 空白 括弧 空白 **参数列表** ...
         :statement_ocall => (str, subvals) -> Inheritance( # subvals结构：**标识符(操作名)** 空白 括弧 空白 **词项数组** 空白 **词项数组** ...
             TermProduct(subvals[5]),
             Operator(subvals[1]),
         ),
+        # subvals结构：排除括弧 **内陈述(陈述)**
+        :statement_inline => (str, subvals) -> subvals[2],
         # 主系词
         :inheritance               => (str, subvals) -> STInheritance,
         :similarity                => (str, subvals) -> STSimilarity,
