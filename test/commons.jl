@@ -45,7 +45,7 @@ if !isdefined(Main, :Test)
     @show s3 = ShortcutParser(
         """ (( q"A" * i"B" ) → o"C" ) ⇔ (d"D" ↔ (w"E" * n"12")) """
     )
-    # 时序合取
+    # 顺序合取
     @show s4 = ∨(⩜(A→B, B→C, C→D), ⩚(A→B, B→C, C→D)) ⇒ (A→D)
     # 副系词|时序蕴含/等价
     s5 = ParConjunction([

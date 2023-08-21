@@ -27,6 +27,7 @@ begin "Pika部分"
     "快捷构造：many × seq" # 函数复合，从右向左优先
     const P_many_seq::Function = P.many ∘ P.seq
     const P_tie_seq::Function = P.tie ∘ P.seq
+    const P_tie_first::Function = P.tie ∘ P.first
 
     # 原解析器 #
     const NARSESE_RULES_ALPHA::Dict = Dict(
@@ -44,6 +45,7 @@ begin "Pika部分"
         # 基础数据类型 #
         # 空白: 不限量个空白字符
         :ws => P.many(P.satisfy(isspace)),
+        :ws_some => P.some(P.satisfy(isspace)), # 至少一个空白符
         # 数字
         :digit => P.satisfy(isdigit), # 直接传递不解析
         :uint => P.some(:digit), # 【20230816 16:11:12】some：至少有一个
@@ -72,7 +74,10 @@ begin "Pika部分"
             )
         ),
         # 用于分隔符
-        :compound_separator => P.token(','), # 纯分隔符，不加尾缀
+        :compound_separator => P.first(
+            P.token(','), # 相当于「强制断开」
+            P.followed_by(:ws_some), # 若前面已经有空白符分隔，则「自动补全分隔符」
+        ), # 纯分隔符，不加尾缀
         # 任务 #
         :task => P_prefix( # [预算值] 语句
             # P_one(:budget), # ⚠【20230816 17:12:40】不允许放第一个的「前导空字符」搜索「First with non-terminal epsilon match」
@@ -172,29 +177,32 @@ begin "Pika部分"
             P_many_seq( # 任意多词项
                 :ws, 
                 :compound_separator, :ws,
-                P.first(:placeholder, :term),
+                :term,
             ), # 无尾缀空白符
         ),
-        # 相当于「像占位符」只在「像の语法」中有定义
-        :inner_compound_with_placeholder => P_tie_seq( # 📝此处的「tie」相当于Lark中的「内联」与Julia中的「@inline」，会把解析出的参数组展开到被包含的地方，且支持同时匹配多个
-            P.first(:placeholder, :term), # 允许像占位符定义(必须优先，不然作词项名)
-            P_many_seq(
-                :ws, 
-                :compound_separator, :ws,
-                P.first(:placeholder, :term), # 允许像占位符定义(必须优先，不然作词项名)
-            ), # 无尾缀空白符
-        ),
+        # 【20230821 23:09:19】现在不再需要：`term`规则自带像占位符
+        # 中缀表达式
+        :inner_compound_infix => P.seq(
+            :term, :ws,
+            # 【20230821 23:39:38】因「短运算符截断」与「如何优先向前搜索」问题，暂时不区分运算符优先级（但括号是可选的）
+                # 优先级：外延交& 内涵交| 平行合取&| 序列合取&/ 合取&& 析取|| 乘积*
+                # 例如：`A&B|B&C` = (A&B)|(B&C)
+            :compound_connector, :ws,
+            :term,
+        ), # 无尾缀空白符
         :compound => P.first( # 复合词项
             # 外延集
             :ext_set => P.seq(
                 P.token('{'), :ws,
                 :inner_compound, :ws, # 不允许空集存在
+                P_one(:compound_separator), :ws, # 「尾后逗号」
                 P.token('}'), :ws,
             ),
             # 内涵集
             :int_set => P.seq(
                 P.token('['), :ws,
                 :inner_compound, :ws, # 不允许空集存在
+                P_one(:compound_separator), :ws, # 「尾后逗号」
                 P.token(']'), :ws,
             ),
             # 外延像
@@ -202,7 +210,8 @@ begin "Pika部分"
                 P.token('('), :ws,
                 P.token('/'), :ws,
                 :compound_separator, :ws,
-                :inner_compound_with_placeholder, :ws,
+                :inner_compound, :ws,
+                P_one(:compound_separator), :ws, # 「尾后逗号」
                 P.token(')'), :ws,
             ),
             # 内涵像
@@ -210,7 +219,8 @@ begin "Pika部分"
                 P.token('('), :ws,
                 P.token('\\'), :ws,
                 :compound_separator, :ws,
-                :inner_compound_with_placeholder, :ws,
+                :inner_compound, :ws,
+                P_one(:compound_separator), :ws, # 「尾后逗号」
                 P.token(')'), :ws,
             ),
             # `一元连接符 词项`的形式
@@ -224,12 +234,32 @@ begin "Pika部分"
                 :compound_connector, :ws,
                 :compound_separator, :ws,
                 :inner_compound, :ws,
+                P_one(:compound_separator), :ws, # 「尾后逗号」
                 P.token(')'), :ws,
             ),
-            # 「无连接符⇒默认乘积`*`」的`(词项...)` => `(*, 词项...)` 形式
+            # 「多元运算符作二元运算符」的`词项 连接符 词项`形式
+            :compound_infix => P.seq(
+                P.token('('), :ws,
+                :inner_compound_infix, :ws,
+                P.token(')'), :ws,
+            ),
+            # 🆕裸露的「复合词项」`A*B == (*,A,B)`中缀形式
+            #= 已知漏洞：
+                pa("(A-->B) && (C-->D) ")
+                    <A --> B>
+                    预期：(&&, <A --> B>, <C --> D>)
+                pa("(A)-->(D)")
+                    (*, A)
+                    预期：<(*, A) --> (*, D)>
+                =#
+            :compound_infix_inline => P.seq(
+                :inner_compound_infix, :ws, # 允许继续嵌套而无需括号，但是右结合如「`(A-B-C)`=`(A-(B-C))`」
+            ),
+            # 兜底：「无连接符⇒默认乘积`*`」的`(词项...)` => `(*, 词项...)` 形式
             :compound_no_prefix => P.seq(
                 P.token('('), :ws,
                 :inner_compound, :ws,
+                P_one(:compound_separator), :ws, # 「尾后逗号」
                 P.token(')'), :ws,
             ),
         ),
@@ -244,7 +274,6 @@ begin "Pika部分"
             # 正常的「尖括号」形式：`<term copula term>`
             :statement_angle => P.seq(
                 P.token('<'), :ws,
-                parser.compound_brackets[Compound][1]
                 :inner_statement,
                 P.token('>'), :ws,
             ),
@@ -259,6 +288,7 @@ begin "Pika部分"
                 :identifier, :ws,
                 P.token('('), :ws,
                 :inner_compound, :ws,
+                P_one(:compound_separator), :ws, # 「尾后逗号」
                 P.token(')'), :ws,
             ),
             # 🆕简略的「无括号」形式：`term copula term`
@@ -312,6 +342,7 @@ begin "Pika部分"
             # 基础数据类型 #
             # 空白: 不限量个空白字符
             :ws => P.epsilon, # 【20230820 23:00:37】不要再预设空白符了，这个「处理空白符」的任务已交给「预处理函数」
+            :ws_some => P.some(P.satisfy(isspace)), # 至少一个空白符
             # 数字
             :digit => P.satisfy(isdigit), # 直接传递不解析
             :uint => P.some(:digit), # 【20230816 16:11:12】some：至少有一个
@@ -340,7 +371,10 @@ begin "Pika部分"
                 )
             ),
             # 用于分隔符
-            :compound_separator => P_token(parser.comma_d2t), # 纯分隔符，不加尾缀
+            :compound_separator => P.first(
+                P_token(parser.comma_d2t), # ⚠分隔符可能是空白符（如LaTeX）
+                P.followed_by(:ws_some), # 前面已经是空格符了，就默认在此处补全分隔符
+            ), # 纯分隔符，不加尾缀
             # 任务 #
             :task => P_prefix( # [预算值] 语句
                 # P_one(:budget), # ⚠【20230816 17:12:40】不允许放第一个的「前导空字符」搜索「First with non-terminal epsilon match」
@@ -442,26 +476,20 @@ begin "Pika部分"
                     P.first(:placeholder, :term),
                 ), # 无尾缀空白符
             ),
-            # 相当于「像占位符」只在「像の语法」中有定义
-            :inner_compound_with_placeholder => P_tie_seq( # 📝此处的「tie」相当于Lark中的「内联」与Julia中的「@inline」，会把解析出的参数组展开到被包含的地方，且支持同时匹配多个
-                P.first(:placeholder, :term), # 允许像占位符定义(必须优先，不然作词项名)
-                P_many_seq(
-                    :ws, 
-                    :compound_separator, :ws,
-                    P.first(:placeholder, :term), # 允许像占位符定义(必须优先，不然作词项名)
-                ), # 无尾缀空白符
-            ),
+            # 【20230821 23:06:15】现在`:term`规则默认包含「像占位符」，不再需要`:inner_compound_with_placeholder`了
             :compound => P.first( # 复合词项
                 # 外延集
                 :ext_set => P.seq(
                     P_token(parser.compound_brackets[ExtSet][1]), :ws,
                     :inner_compound, :ws, # 不允许空集存在
+                    P_one(:compound_separator), :ws, # 「尾后逗号」
                     P_token(parser.compound_brackets[ExtSet][2]), :ws,
                 ),
                 # 内涵集
                 :int_set => P.seq(
                     P_token(parser.compound_brackets[IntSet][1]), :ws,
                     :inner_compound, :ws, # 不允许空集存在
+                    P_one(:compound_separator), :ws, # 「尾后逗号」
                     P_token(parser.compound_brackets[IntSet][2]), :ws,
                 ),
                 # 外延像
@@ -469,7 +497,8 @@ begin "Pika部分"
                     P_token(parser.compound_brackets[Compound][1]), :ws,
                     P_token(parser.compound_symbols[ExtImage]), :ws,
                     :compound_separator, :ws,
-                    :inner_compound_with_placeholder, :ws,
+                    :inner_compound, :ws,
+                    P_one(:compound_separator), :ws, # 「尾后逗号」
                     P_token(parser.compound_brackets[Compound][2]), :ws,
                 ),
                 # 内涵像
@@ -477,7 +506,8 @@ begin "Pika部分"
                     P_token(parser.compound_brackets[Compound][1]), :ws,
                     P_token(parser.compound_symbols[IntImage]), :ws,
                     :compound_separator, :ws,
-                    :inner_compound_with_placeholder, :ws,
+                    :inner_compound, :ws,
+                    P_one(:compound_separator), :ws, # 「尾后逗号」
                     P_token(parser.compound_brackets[Compound][2]), :ws,
                 ),
                 # `一元连接符 词项`的形式
@@ -491,12 +521,14 @@ begin "Pika部分"
                     :compound_connector, :ws,
                     :compound_separator, :ws,
                     :inner_compound, :ws,
+                    P_one(:compound_separator), :ws, # 「尾后逗号」
                     P_token(parser.compound_brackets[Compound][2]), :ws,
                 ),
                 # 「无连接符⇒默认乘积`*`」的`(词项...)` => `(*, 词项...)` 形式
                 :compound_no_prefix => P.seq(
                     P_token(parser.compound_brackets[Compound][1]), :ws,
                     :inner_compound, :ws,
+                    P_one(:compound_separator), :ws, # 「尾后逗号」
                     P_token(parser.compound_brackets[Compound][2]), :ws,
                 ),
             ),
@@ -525,6 +557,7 @@ begin "Pika部分"
                     :identifier, :ws,
                     P_token(parser.compound_brackets[Compound][1]), :ws,
                     :inner_compound, :ws,
+                    P_one(:compound_separator), :ws, # 「尾后逗号」
                     P_token(parser.compound_brackets[Compound][2]), :ws,
                 ),
                 # 🆕简略的「无括号」形式：`term copula term`
@@ -622,8 +655,10 @@ begin "Pika部分"
         :ext_intersection => (str, subvals) -> JuNarsese.ExtIntersection,
         :int_intersection => (str, subvals) -> JuNarsese.IntIntersection,
         # 内联语法: 返回列表中的非空子元素（nothing从分隔符等来）
-        :inner_compound                  => (str, subvals) -> subvals, # 【20230818 15:08:25 假定】subvals结构：词项...
-        :inner_compound_with_placeholder => (str, subvals) -> subvals,
+        # 【20230818 15:08:25 假定】（使用了`P.tie`）subvals结构：词项...
+        :inner_compound       => (str, subvals) -> subvals,
+        # subvals结构：**词项** 空白 **连接词(复合词项类型)** 空白 **词项**
+        :inner_compound_infix => (str, subvals) -> subvals[3](subvals[1], subvals[5]),
         # 具体复合词项
         :ext_set   => (str, subvals) -> JuNarsese.ExtSet(subvals[3]), # subvals结构：括号 空白 *词项集合* 空白 括号 空白
         :int_set   => (str, subvals) -> JuNarsese.IntSet(subvals[3]), # subvals结构：括号 空白 *词项集合* 空白 括号 空白
@@ -876,23 +911,20 @@ begin "JuNarsese部分"
 
     end
 
+    # 字符串显示
+    @redirect_SRS parser::PikaParser parser.name
+
     """
-    定义「JSON转换」的「目标类型」
-    - JSON字串↔词项/语句
+    定义「Pika转换」的「目标类型」
+    - 字串↔词项/语句
     """
     const PIKA_PARSE_TARGETS::Type = JuNarsese.Conversion.DEFAULT_PARSE_TARGETS
 
-    "目标类型：词项/语句"
+    "目标类型：Narsese"
     Conversion.parse_target_types(::PikaParser) = PIKA_PARSE_TARGETS
 
-    "数据类型：以JSON表示的字符串"
+    "数据类型：扩展的Narsese文本"
     Base.eltype(::PikaParser)::Type = String
-
-    "重载「字符串宏の快捷方式」:lark"
-    Conversion.get_parser_from_flag(::Val{:pika})::TAbstractParser = PikaParser_alpha
-
-    # 字符串显示
-    @redirect_SRS parser::PikaParser parser.name
 
     begin "具体转换实现"
         
@@ -959,5 +991,17 @@ begin "JuNarsese部分"
         NARSESE_DEFAULT_FOLDS;
         start = :top
     )
+
+    "重载「字符串宏の快捷方式」`:pika`⇒`PikaParser_alpha`"
+    Conversion.get_parser_from_flag(::Val{:pika})::TAbstractParser = PikaParser_alpha
+    Conversion.get_parser_from_flag(::Val{:pika_alpha})::TAbstractParser = PikaParser_alpha
+    Conversion.get_parser_from_flag(::Val{:pika_α})::TAbstractParser = PikaParser_alpha
+    
+    # 重载「字符串宏の快捷方式」`:pika_XXX`⇒`PikaParser_XXX`
+    for symbol in (:ascii, :latex, :han)
+        Conversion.get_parser_from_flag(::Val{Symbol(:pika_, symbol)})::TAbstractParser = eval(
+            Symbol("PikaParser_" * string(symbol))
+        )
+    end
 
 end
