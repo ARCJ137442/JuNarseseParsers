@@ -24,7 +24,7 @@ begin "Lerche部分"
     const ORIGINAL_NARSESE_GRAMMAR::String = raw"""
 
     // 入口 迁移者注：此元素也可以通过parser中的「start」参数指定
-    ?start: sentence | term         // 迁移者注：此处转换成词项/语句，以示明晰（任务暂不使用）
+    ?start: task | sentence | term         // 迁移者注：此处转换成词项/语句，以示明晰（任务暂不使用）
     
     // 基础类型
 
@@ -43,7 +43,7 @@ begin "Lerche部分"
                 |   /[^\-\+\<\>\=\"\&\|\!\.\?\@\~\%\;\,\:\/\\\\\*\#\$\\\[\\\]\{\}\(\)\^ ]+/   // 【20230815 11:13:44】此处的正则不再需要转义
     
     // 任务 & 语句
-    task : [budget] sentence                                                // 待处理的任务
+    task : budget sentence                                                // 待处理的任务【20230822 23:20:07】现在没预算会变成语句，不再需要可选项标记
     ?sentence.0 : (term_nonvar|statement) "." [tense] [truth]  -> judgement // 判断→信念
         | (term_nonvar|statement) "?" [tense]            -> question        // 用于询问「真值」的「问题」
         | (term_nonvar|statement) "!" [tense] [desire]   -> goal            // 待使用「操作」实现的「目标」
@@ -122,7 +122,7 @@ begin "Lerche部分"
     int_image : "(" con_int_image "," term ("," term)* ")"                              // 内涵像 🆕限制只有一个像占位符
     ext_image : "(" con_ext_image "," term ("," term)* ")"                              // 外延像
     
-    // place_holder : /_+/  // 🆕像占位符：会变成nothing 【20230815 0:01:41】在word中处理，因为使用「"(" con_int_image "," (term ",")* place_holder ("," term)* ")"」的方法不可行：无法识别是「全下划线字符串（然后误认为没有识别到像占位符）」还是真的「像占位符」
+    // place_holder : /_+/  // 像占位符【20230815 0:01:41】在word中处理，因为使用「"(" con_int_image "," (term ",")* place_holder ("," term)* ")"」的方法不可行：无法识别是「全下划线字符串（然后误认为没有识别到像占位符）」还是真的「像占位符」
     
     ?multi : "(" con_multi "," term ("," term)+ ")" -> multi_prefix                                 // 前缀算符
         | "(" multi_infix_expr ")"                                                                  // 中缀算符
@@ -217,8 +217,16 @@ begin "Lerche部分"
                 kwargs[:stamp] = arg
             end
         end
-        # @show kwargs
         return type(term; kwargs...)
+    end
+
+    """
+    构造任务
+    - 
+    """
+    function form_task(args)
+        budget, sentence = args
+        TaskBasic(sentence, budget)
     end
 
     # 基础类型 #
@@ -233,9 +241,16 @@ begin "Lerche部分"
 
     @rule quest(t::NarseseTransformer, args) = form_sentence(SentenceQuest, args)
 
+    @rule task(t::NarseseTransformer, args) = form_task(args)
+
     "调用默认方法，使用默认精度（保证可控性，减少硬编码）"
-    @rule truth(t::NarseseTransformer, nums) = Truth(
+    @rule truth(t::NarseseTransformer, nums) = JuNarsese.default_precision_truth(
         nums... # f, c, k
+    )
+
+    "调用默认方法，使用默认精度（保证可控性，减少硬编码）"
+    @rule budget(t::NarseseTransformer, nums) = JuNarsese.default_precision_budget(
+        nums... # p, d, q
     )
 
     # 时间戳
@@ -280,7 +295,7 @@ begin "Lerche部分"
     @inline_rule word_term(t::NarseseTransformer, token) = (
         isnothing(findfirst(r"^_+$", token.value)) ? 
             Word(token.value) : # 没找到：正常词项
-            nothing # 像占位符：全下划线
+            placeholder # 像占位符：全下划线
     ) # 使用.value访问Token的值
 
     @inline_rule independent_var(t::NarseseTransformer, token) = IVar(token.value)
@@ -293,10 +308,10 @@ begin "Lerche部分"
     
     @inline_rule interval(t::NarseseTransformer, float) = Interval(float)
 
-    @inline_rule compound_term(t::NarseseTransformer, term) = term # @show term
+    @inline_rule compound_term(t::NarseseTransformer, term) = term
 
-    # # 🆕像占位符：会变成nothing
-    # @inline place_holder(t::NarseseTransformer) = nothing
+    # # 像占位符
+    # @inline place_holder(t::NarseseTransformer) = placeholder
 
     # 陈述
     # args：包含一个Statement对象的数组（参考自parser.py） 「cannot document the following expression」

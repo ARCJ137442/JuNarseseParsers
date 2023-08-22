@@ -1,7 +1,7 @@
 name = "JuNarseseParsers"
 uuid = "0a59fa39-45d5-416d-90fd-544de8e6e92c"
 authors = ["ARCJ137442 <61109168+ARCJ137442@users.noreply.github.com>"]
-version = "1.4.0"
+version = "1.5.0"
 
 [deps]
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"

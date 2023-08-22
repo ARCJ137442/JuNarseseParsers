@@ -609,7 +609,36 @@ begin "解析の逻辑"
     """
     @inline xml_pack(::TXMLParser_optimized, t::Truth)::XML.Node = xml_form_struct(
         Conversion.pack_type_string(t), # 词项类型⇒元素标签
-        (f=string(t.f),c = string(t.c)), # 属性：f、c
+        ( # 属性：f、c
+            f = string(get_f(t)),
+            c = string(get_c(t)),
+        ),
+    )
+
+    """
+    特别解析@带优化：节点⇒预算值
+    """
+    function xml_parse_special(::TXMLParser_optimized, ::Type{T}, n::XML.Node)::Budget where {T <: Budget}
+        type::DataType = parse_node_type(n, Narsese.eval) # 获得类型
+        # 解析其中的p、d、q值：从类名中获得精度信息
+        p_str::String, d_str::String, q_str::String = n.attributes["p"], n.attributes["d"], n.attributes["q"]
+        precision::Type = (@show type.types)[1] # 只有一个精度
+        p::precision, d::precision, q::precision = parse(precision, p_str), parse(precision, d_str), parse(precision, q_str)
+        # 构造
+        return type(p, d, q)
+    end
+    
+    raw"""
+    预打包：预算值⇒XML节点
+    - 示例：`$1.0;0.75;0.5$` ⇒ `<Budget16 p="1.0", d="0.75" q="0.5" />`
+    """
+    @inline xml_pack(::TXMLParser_optimized, b::Budget)::XML.Node = xml_form_struct(
+        Conversion.pack_type_string(b), # 词项类型⇒元素标签
+        ( # 属性：p、d、q
+            p = string(get_p(b)),
+            d = string(get_d(b)),
+            q = string(get_q(b)),
+        ),
     )
 
     """

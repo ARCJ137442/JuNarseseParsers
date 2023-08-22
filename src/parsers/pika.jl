@@ -34,7 +34,7 @@ begin "Pika部分"
             # 元：开头/忽略 #
             :top => P.seq( # 顶层，支持删去包围的空白符
             :ws, # 前导空白符
-            :narsese, # 📌task尚不支持
+            :narsese, # 📌task尚不支持                           
             # :ws, # 后缀空白符(其它地方的代码已有)
         ),
         :narsese => P.first(
@@ -79,19 +79,18 @@ begin "Pika部分"
             P.followed_by(:ws_some), # 若前面已经有空白符分隔，则「自动补全分隔符」
         ), # 纯分隔符，不加尾缀
         # 任务 #
-        :task => P_prefix( # [预算值] 语句
-            # P_one(:budget), # ⚠【20230816 17:12:40】不允许放第一个的「前导空字符」搜索「First with non-terminal epsilon match」
-            :budget, # 可选前缀「预算值」
+        :task => P.seq( # 预算值 语句
+            :budget, :ws, # 可选前缀「预算值」
             :sentence, # 语句
         ),
         :budget => P.seq(
             P.token('$'), :ws,
             :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
-            P_many_seq( # 具体多少个，留给后续限定
-                P.token(';'), :ws,
-                :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
-            ),
-            P.token('$'), :ws,
+            P.token(';'), :ws,
+            :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
+            P.token(';'), :ws,
+            :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
+            P.token('$'),
         ),
         # 语句 #
         :sentence => P.seq( # 词项 标点 [时间戳] [真值] # TODO：是否可以直接在时间戳上加个候选项「:ws」以实现统一管理「默认值」？
@@ -323,273 +322,272 @@ begin "Pika部分"
     )
 
     # 字符串解析器转译部分 #
-        "_txt_to_token: 在基于字符的解析器中，将字符串/字符解析为对应Token标识符（空字串⇒空串表达式）"
-        P_token(str::AbstractString)::P.Clause = isempty(str) ? P.epsilon : P.tokens(str)
-        P_token(chr::AbstractChar)::P.Clause = P.token(chr)
+    "_txt_to_token: 在基于字符的解析器中，将字符串/字符解析为对应Token标识符（空字串⇒空串表达式）"
+    P_token(str::AbstractString)::P.Clause = isempty(str) ? P.epsilon : P.tokens(str)
+    P_token(chr::AbstractChar)::P.Clause = P.token(chr)
 
-        generate_rule_from_string_parser(parser::JuNarsese.Conversion.StringParser)::Dict = Dict(
-            # 元：开头/忽略 #
-            :top => P.seq( # 顶层，支持删去包围的空白符
-                :ws, # 前导空白符
-                :narsese, # 📌task尚不支持
-                # :ws, # 后缀空白符(其它地方的代码已有)
-            ),
-            :narsese => P.first(
-                :task,
-                :sentence,
-                :term,
-            ),
-            # 基础数据类型 #
-            # 空白: 不限量个空白字符
-            :ws => P.epsilon, # 【20230820 23:00:37】不要再预设空白符了，这个「处理空白符」的任务已交给「预处理函数」
-            :ws_some => P.some(P.satisfy(isspace)), # 至少一个空白符
-            # 数字
-            :digit => P.satisfy(isdigit), # 直接传递不解析
-            :uint => P.some(:digit), # 【20230816 16:11:12】some：至少有一个
-            :unsigned_number => P.first(
-                P.seq( # `XXX[.XXX]`
-                    P.some(:digit), # 【20230816 16:31:36】many：有多个/没有
-                    P.first(
-                        P.seq( # `.XXXXXX`
-                            P.token('.'), 
-                            P.some(:digit)
-                        ), 
-                        P.epsilon # 或者为空
-                    ),
-                ),
-                P.seq( # `.XXX` (优先匹配长的)
-                    P.token('.'), 
-                    P.some(:digit),
+    generate_rule_from_string_parser(parser::JuNarsese.Conversion.StringParser)::Dict = Dict(
+        # 元：开头/忽略 #
+        :top => P.seq( # 顶层，支持删去包围的空白符
+            :ws, # 前导空白符
+            :narsese, # 📌task尚不支持
+            # :ws, # 后缀空白符(其它地方的代码已有)
+        ),  
+        :narsese => P.first(
+            :task,
+            :sentence,
+            :term,
+        ),
+        # 基础数据类型 #
+        # 空白: 不限量个空白字符
+        :ws => P.epsilon, # 【20230820 23:00:37】不要再预设空白符了，这个「处理空白符」的任务已交给「预处理函数」
+        :ws_some => P.some(P.satisfy(isspace)), # 至少一个空白符
+        # 数字
+        :digit => P.satisfy(isdigit), # 直接传递不解析
+        :uint => P.some(:digit), # 【20230816 16:11:12】some：至少有一个
+        :unsigned_number => P.first(
+            P.seq( # `XXX[.XXX]`
+                P.some(:digit), # 【20230816 16:31:36】many：有多个/没有
+                P.first(
+                    P.seq( # `.XXXXXX`
+                        P.token('.'), 
+                        P.some(:digit)
+                    ), 
+                    P.epsilon # 或者为空
                 ),
             ),
-            # 用于词项名
-            :identifier => P.seq( # 与Julia变量名标准一致的标识符
-                P.satisfy(Base.is_id_start_char), # 调用Julia内部识别变量名的方法✅
-                P_many_seq(
-                    P.not_followed_by(:copula), # 【20230820 23:43:23】系词是保留字，不能把系词吃了！
-                    P.satisfy(Base.is_id_char), # 调用Julia内部识别变量名的方法✅
-                )
+            P.seq( # `.XXX` (优先匹配长的)
+                P.token('.'), 
+                P.some(:digit),
             ),
-            # 用于分隔符
-            :compound_separator => P.first(
-                P_token(parser.comma_d2t), # ⚠分隔符可能是空白符（如LaTeX）
-                P.followed_by(:ws_some), # 前面已经是空格符了，就默认在此处补全分隔符
-            ), # 纯分隔符，不加尾缀
-            # 任务 #
-            :task => P_prefix( # [预算值] 语句
-                # P_one(:budget), # ⚠【20230816 17:12:40】不允许放第一个的「前导空字符」搜索「First with non-terminal epsilon match」
-                :budget, # 可选前缀「预算值」
-                :sentence, # 语句
-            ),
-            :budget => P.seq(
-                P_token(parser.budget_brackets[1]), :ws,
+        ),
+        # 用于词项名
+        :identifier => P.seq( # 与Julia变量名标准一致的标识符
+            P.satisfy(Base.is_id_start_char), # 调用Julia内部识别变量名的方法✅
+            P_many_seq(
+                P.not_followed_by(:copula), # 【20230820 23:43:23】系词是保留字，不能把系词吃了！
+                P.satisfy(Base.is_id_char), # 调用Julia内部识别变量名的方法✅
+            )
+        ),
+        # 用于分隔符
+        :compound_separator => P.first(
+            P_token(parser.comma_d2t), # ⚠分隔符可能是空白符（如LaTeX）
+            P.followed_by(:ws_some), # 前面已经是空格符了，就默认在此处补全分隔符
+        ), # 纯分隔符，不加尾缀
+        # 任务 #
+        :task => P.seq( # 预算值 语句
+            :budget, :ws, # 可选前缀「预算值」
+            :sentence, # 语句
+        ),
+        :budget => P.seq(
+            P_token(parser.budget_brackets[1]), :ws,
+            :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
+            P_token(parser.budget_separator), :ws,
+            :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
+            P_token(parser.budget_separator), :ws,
+            :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
+            P_token(parser.budget_brackets[2]), 
+        ),
+        # 语句 #
+        :sentence => P.seq( # 词项 标点 [时间戳] [真值] # TODO：是否可以直接在时间戳上加个候选项「:ws」以实现统一管理「默认值」？
+            :term, :ws, # 内含之词项，至于「不能用变量当语句中的词项」留给「构造方法の合法性检查」
+            :punctuation, :ws, # 标点，用于决定语句类型
+            :stamp, :ws, # 时间戳(可为空)
+            :truth, :ws, # 真值(可为空)
+        ),
+        :punctuation => P.first(
+            :punct_judgement => P_token(parser.punctuation_dict[PunctuationJudgement]),
+            :punct_question  => P_token(parser.punctuation_dict[PunctuationQuestion]),
+            :punct_goal      => P_token(parser.punctuation_dict[PunctuationGoal]),
+            :punct_quest     => P_token(parser.punctuation_dict[PunctuationQuest]),
+        ),
+        :truth => P.first( # 不直接使用
+            :truth_valued => P.seq(
+                P_token(parser.truth_brackets[1]), :ws,
                 :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
-                P_many_seq( # 具体多少个，留给后续限定
-                    P_token(parser.budget_separator), :ws,
+                P_many_seq( # 具体多少个，留给「构造方法の合法性检查」
+                    P_token(parser.truth_separator), :ws,
                     :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
                 ),
-                P_token(parser.budget_brackets[2]), :ws,
+                P_token(parser.truth_brackets[2]),
             ),
-            # 语句 #
-            :sentence => P.seq( # 词项 标点 [时间戳] [真值] # TODO：是否可以直接在时间戳上加个候选项「:ws」以实现统一管理「默认值」？
-                :term, :ws, # 内含之词项，至于「不能用变量当语句中的词项」留给「构造方法の合法性检查」
-                :punctuation, :ws, # 标点，用于决定语句类型
-                :stamp, :ws, # 时间戳(可为空)
-                :truth, :ws, # 真值(可为空)
+            :truth_default => P.epsilon,
+        ),
+        :stamp => P.first( # 不允许多余空白
+            # 带时刻时间戳
+            :stamp_timed => P.seq(
+                P_token(parser.timed_stamp_brackets[1]), # 序列
+                :uint, # 无符号整数
+                P_token(parser.timed_stamp_brackets[2]),
             ),
-            :punctuation => P.first(
-                :punct_judgement => P_token(parser.punctuation_dict[PunctuationJudgement]),
-                :punct_question  => P_token(parser.punctuation_dict[PunctuationQuestion]),
-                :punct_goal      => P_token(parser.punctuation_dict[PunctuationGoal]),
-                :punct_quest     => P_token(parser.punctuation_dict[PunctuationQuest]),
+            # 固定时态时间戳
+            :stamp_past    => P_token(parser.tense_dict[Past]), # 过去时
+            :stamp_present => P_token(parser.tense_dict[Present]), # 现在时
+            :stamp_future  => P_token(parser.tense_dict[Future]), # 未来时
+            :stamp_default => P_token(parser.tense_dict[Eternal]), # 永恒
+        ),
+        # 词项 #
+        # 总领
+        :term => P.first( # 陈述、复合、原子
+            :statement, # 陈述作为词项
+            :compound, # 复合词项
+            :atom, # 原子词项
+        ),
+        # 原子
+        :atom => P.first(
+            :i_var    => P.seq(P_token(parser.atom_prefixes[IVar]), :identifier),
+            :d_var    => P.seq(P_token(parser.atom_prefixes[DVar]), :identifier),
+            :q_var    => P.seq(P_token(parser.atom_prefixes[QVar]), :identifier),
+            :operator => P.seq(P_token(parser.atom_prefixes[Operator]), :identifier),
+            :interval => P.seq(P_token(parser.atom_prefixes[Interval]), :uint), # 区间`+非负整数`
+            # 像占位符：全下划线
+            :placeholder => P_token(parser.atom_prefixes[PlaceHolder]), # 新的「像占位符」
+            :word => P.seq(:identifier), # 单序列
+        ),
+        # 复合
+        :compound_connector => P.first(
+            # 一元算符
+            :compound_connector_unary => P.first(
+                :negation => P_token(parser.compound_symbols[Negation]),
             ),
-            :truth => P.first( # 不直接使用
-                :truth_valued => P.seq(
-                    P_token(parser.truth_brackets[1]), :ws,
-                    :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
-                    P_many_seq( # 具体多少个，留给「构造方法の合法性检查」
-                        P_token(parser.truth_separator), :ws,
-                        :unsigned_number, :ws, # 数值范围限定留给「构造方法の合法性检查」
-                    ),
-                    P_token(parser.truth_brackets[2]),
-                ),
-                :truth_default => P.epsilon,
+            # 二元/多元运算符（都支持`A * B`的形式）
+            :compound_connector_multi => P.first(
+                :ext_difference   => P_token(parser.compound_symbols[ExtDiff]),
+                :int_difference   => P_token(parser.compound_symbols[IntDiff]),
+                # 多元运算符
+                :conjunction      => P_token(parser.compound_symbols[Conjunction]), # 字符多的比少的优先！避免「被提前捞走」产生多余字符引起的「token重复谬误」
+                :disjunction      => P_token(parser.compound_symbols[Disjunction]),
+                :par_conjunction  => P_token(parser.compound_symbols[ParConjunction]),
+                :seq_conjunction  => P_token(parser.compound_symbols[SeqConjunction]),
+                :product          => P_token(parser.compound_symbols[TermProduct]),
+                :ext_intersection => P_token(parser.compound_symbols[ExtIntersection]),
+                :int_intersection => P_token(parser.compound_symbols[IntIntersection]),
+                # :rev_conjunction => P_token(parser.compound_symbols[RevConjunction]), # 为了对称🤷
             ),
-            :stamp => P.first( # 不允许多余空白
-                # 带时刻时间戳
-                :stamp_timed => P.seq(
-                    P_token(parser.timed_stamp_brackets[1]), # 序列
-                    :uint, # 无符号整数
-                    P_token(parser.timed_stamp_brackets[2]),
-                ),
-                # 固定时态时间戳
-                :stamp_past    => P_token(parser.tense_dict[Past]), # 过去时
-                :stamp_present => P_token(parser.tense_dict[Present]), # 现在时
-                :stamp_future  => P_token(parser.tense_dict[Future]), # 未来时
-                :stamp_default => P_token(parser.tense_dict[Eternal]), # 永恒
+        ),
+        # 刻画形如`词项, 词项, ..., 词项`的**内联**语法
+        :inner_compound => P_tie_seq( # 📝此处的「tie」相当于Lark中的「内联」与Julia中的「@inline」，会把解析出的参数组展开到被包含的地方，且支持同时匹配多个
+            :term, # 不允许空集存在
+            P_many_seq( # 任意多词项
+                :ws, 
+                :compound_separator, :ws,
+                P.first(:placeholder, :term),
+            ), # 无尾缀空白符
+        ),
+        # 【20230821 23:06:15】现在`:term`规则默认包含「像占位符」，不再需要`:inner_compound_with_placeholder`了
+        :compound => P.first( # 复合词项
+            # 外延集
+            :ext_set => P.seq(
+                P_token(parser.compound_brackets[ExtSet][1]), :ws,
+                :inner_compound, :ws, # 不允许空集存在
+                P_one(:compound_separator), :ws, # 「尾后逗号」
+                P_token(parser.compound_brackets[ExtSet][2]), :ws,
             ),
-            # 词项 #
-            # 总领
-            :term => P.first( # 陈述、复合、原子
-                :statement, # 陈述作为词项
-                :compound, # 复合词项
-                :atom, # 原子词项
+            # 内涵集
+            :int_set => P.seq(
+                P_token(parser.compound_brackets[IntSet][1]), :ws,
+                :inner_compound, :ws, # 不允许空集存在
+                P_one(:compound_separator), :ws, # 「尾后逗号」
+                P_token(parser.compound_brackets[IntSet][2]), :ws,
             ),
-            # 原子
-            :atom => P.first(
-                :i_var    => P.seq(P_token(parser.atom_prefixes[IVar]), :identifier),
-                :d_var    => P.seq(P_token(parser.atom_prefixes[DVar]), :identifier),
-                :q_var    => P.seq(P_token(parser.atom_prefixes[QVar]), :identifier),
-                :operator => P.seq(P_token(parser.atom_prefixes[Operator]), :identifier),
-                :interval => P.seq(P_token(parser.atom_prefixes[Interval]), :uint), # 区间`+非负整数`
-                # 像占位符：全下划线
-                :placeholder => P_token(parser.atom_prefixes[PlaceHolder]), # 新的「像占位符」
-                :word => P.seq(:identifier), # 单序列
+            # 外延像
+            :ext_image => P.seq(
+                P_token(parser.compound_brackets[Compound][1]), :ws,
+                P_token(parser.compound_symbols[ExtImage]), :ws,
+                :compound_separator, :ws,
+                :inner_compound, :ws,
+                P_one(:compound_separator), :ws, # 「尾后逗号」
+                P_token(parser.compound_brackets[Compound][2]), :ws,
             ),
-            # 复合
-            :compound_connector => P.first(
-                # 一元算符
-                :compound_connector_unary => P.first(
-                    :negation => P_token(parser.compound_symbols[Negation]),
-                ),
-                # 二元/多元运算符（都支持`A * B`的形式）
-                :compound_connector_multi => P.first(
-                    :ext_difference   => P_token(parser.compound_symbols[ExtDiff]),
-                    :int_difference   => P_token(parser.compound_symbols[IntDiff]),
-                    # 多元运算符
-                    :conjunction      => P_token(parser.compound_symbols[Conjunction]), # 字符多的比少的优先！避免「被提前捞走」产生多余字符引起的「token重复谬误」
-                    :disjunction      => P_token(parser.compound_symbols[Disjunction]),
-                    :par_conjunction  => P_token(parser.compound_symbols[ParConjunction]),
-                    :seq_conjunction  => P_token(parser.compound_symbols[SeqConjunction]),
-                    :product          => P_token(parser.compound_symbols[TermProduct]),
-                    :ext_intersection => P_token(parser.compound_symbols[ExtIntersection]),
-                    :int_intersection => P_token(parser.compound_symbols[IntIntersection]),
-                    # :rev_conjunction => P_token(parser.compound_symbols[RevConjunction]), # 为了对称🤷
-                ),
+            # 内涵像
+            :int_image => P.seq(
+                P_token(parser.compound_brackets[Compound][1]), :ws,
+                P_token(parser.compound_symbols[IntImage]), :ws,
+                :compound_separator, :ws,
+                :inner_compound, :ws,
+                P_one(:compound_separator), :ws, # 「尾后逗号」
+                P_token(parser.compound_brackets[Compound][2]), :ws,
             ),
-            # 刻画形如`词项, 词项, ..., 词项`的**内联**语法
-            :inner_compound => P_tie_seq( # 📝此处的「tie」相当于Lark中的「内联」与Julia中的「@inline」，会把解析出的参数组展开到被包含的地方，且支持同时匹配多个
-                :term, # 不允许空集存在
-                P_many_seq( # 任意多词项
-                    :ws, 
-                    :compound_separator, :ws,
-                    P.first(:placeholder, :term),
-                ), # 无尾缀空白符
-            ),
-            # 【20230821 23:06:15】现在`:term`规则默认包含「像占位符」，不再需要`:inner_compound_with_placeholder`了
-            :compound => P.first( # 复合词项
-                # 外延集
-                :ext_set => P.seq(
-                    P_token(parser.compound_brackets[ExtSet][1]), :ws,
-                    :inner_compound, :ws, # 不允许空集存在
-                    P_one(:compound_separator), :ws, # 「尾后逗号」
-                    P_token(parser.compound_brackets[ExtSet][2]), :ws,
-                ),
-                # 内涵集
-                :int_set => P.seq(
-                    P_token(parser.compound_brackets[IntSet][1]), :ws,
-                    :inner_compound, :ws, # 不允许空集存在
-                    P_one(:compound_separator), :ws, # 「尾后逗号」
-                    P_token(parser.compound_brackets[IntSet][2]), :ws,
-                ),
-                # 外延像
-                :ext_image => P.seq(
-                    P_token(parser.compound_brackets[Compound][1]), :ws,
-                    P_token(parser.compound_symbols[ExtImage]), :ws,
-                    :compound_separator, :ws,
-                    :inner_compound, :ws,
-                    P_one(:compound_separator), :ws, # 「尾后逗号」
-                    P_token(parser.compound_brackets[Compound][2]), :ws,
-                ),
-                # 内涵像
-                :int_image => P.seq(
-                    P_token(parser.compound_brackets[Compound][1]), :ws,
-                    P_token(parser.compound_symbols[IntImage]), :ws,
-                    :compound_separator, :ws,
-                    :inner_compound, :ws,
-                    P_one(:compound_separator), :ws, # 「尾后逗号」
-                    P_token(parser.compound_brackets[Compound][2]), :ws,
-                ),
-                # `一元连接符 词项`的形式
-                :compound_prefix_unary => P.seq(
-                    :compound_connector_unary, :ws,
-                    :term, :ws,
-                ),
-                # 正常的`(连接符, 词项...)`形式
-                :compound_prefix => P.seq(
-                    P_token(parser.compound_brackets[Compound][1]), :ws,
-                    :compound_connector, :ws,
-                    :compound_separator, :ws,
-                    :inner_compound, :ws,
-                    P_one(:compound_separator), :ws, # 「尾后逗号」
-                    P_token(parser.compound_brackets[Compound][2]), :ws,
-                ),
-                # 「无连接符⇒默认乘积`*`」的`(词项...)` => `(*, 词项...)` 形式
-                :compound_no_prefix => P.seq(
-                    P_token(parser.compound_brackets[Compound][1]), :ws,
-                    :inner_compound, :ws,
-                    P_one(:compound_separator), :ws, # 「尾后逗号」
-                    P_token(parser.compound_brackets[Compound][2]), :ws,
-                ),
-            ),
-            # 刻画内部陈述：词项 系词(陈述类型) 词项
-            :inner_statement => P.seq(
-                :term, :ws,
-                :copula, :ws, # 只实现一般形式，合法性限定留给「构造方法の合法性检查」
+            # `一元连接符 词项`的形式
+            :compound_prefix_unary => P.seq(
+                :compound_connector_unary, :ws,
                 :term, :ws,
             ),
-            # 陈述
-            :statement => P.first(
-                # 正常的「尖括号」形式：`<term copula term>`
-                :statement_angle => P.seq(
-                    P_token(parser.compound_brackets[Statement][1]), :ws,
-                    :inner_statement,
-                    P_token(parser.compound_brackets[Statement][2]), :ws,
-                ),
-                # 「圆括号」形式（仿NARS-Python）：`(term copula term)`
-                :statement_round => P.seq(
-                    P_token(parser.compound_brackets[Compound][1]), :ws,
-                    :inner_statement,
-                    P_token(parser.compound_brackets[Compound][2]), :ws,
-                ),
-                # 类似「函数调用」的`操作(词项...)` => `(*, ⇑操作, 词项...)` 形式
-                :statement_ocall => P.seq(
-                    :identifier, :ws,
-                    P_token(parser.compound_brackets[Compound][1]), :ws,
-                    :inner_compound, :ws,
-                    P_one(:compound_separator), :ws, # 「尾后逗号」
-                    P_token(parser.compound_brackets[Compound][2]), :ws,
-                ),
-                # 🆕简略的「无括号」形式：`term copula term`
-                :statement_inline => P.seq(
-                    P.not_followed_by( # 不能在识别到前面的情况时，再搞一个嵌套「<<A-->B>>」出来
-                        P.first(
-                            P_token(parser.compound_brackets[Compound][1]),
-                            P_token(parser.compound_brackets[Statement][1]),
-                        )
-                    ),
-                    :inner_statement,
-                ),
+            # 正常的`(连接符, 词项...)`形式
+            :compound_prefix => P.seq(
+                P_token(parser.compound_brackets[Compound][1]), :ws,
+                :compound_connector, :ws,
+                :compound_separator, :ws,
+                :inner_compound, :ws,
+                P_one(:compound_separator), :ws, # 「尾后逗号」
+                P_token(parser.compound_brackets[Compound][2]), :ws,
             ),
-            :copula => P.first(
-                # 主系词
-                :inheritance               => P_token(parser.copula_dict[STInheritance]),
-                :similarity                => P_token(parser.copula_dict[STSimilarity]),
-                :implication               => P_token(parser.copula_dict[STImplication]),
-                :equivalence               => P_token(parser.copula_dict[STEquivalence]),
-                # 副系词
-                :instance                  => P_token(parser.copula_dict[STInstance]),
-                :property                  => P_token(parser.copula_dict[STProperty]),
-                :instance_property          => P_token(parser.copula_dict[STInstanceProperty]),
-                # 时序蕴含/等价
-                :predictive_implication        => P_token(parser.copula_dict[STImplicationPredictive]),
-                :concurrent_implication        => P_token(parser.copula_dict[STImplicationConcurrent]),
-                :retrospective_implication     => P_token(parser.copula_dict[STImplicationRetrospective]),
-                :predictive_equivalence        => P_token(parser.copula_dict[STEquivalencePredictive]),
-                :concurrent_equivalence        => P_token(parser.copula_dict[STEquivalenceConcurrent]),
-                :retrospective_equivalence     => P_token(parser.copula_dict[STEquivalenceRetrospective]), # 此「重定向行为」留给「数据类型构造」阶段，最大化减少语法复杂度/非对称性
+            # 「无连接符⇒默认乘积`*`」的`(词项...)` => `(*, 词项...)` 形式
+            :compound_no_prefix => P.seq(
+                P_token(parser.compound_brackets[Compound][1]), :ws,
+                :inner_compound, :ws,
+                P_one(:compound_separator), :ws, # 「尾后逗号」
+                P_token(parser.compound_brackets[Compound][2]), :ws,
             ),
-        )
+        ),
+        # 刻画内部陈述：词项 系词(陈述类型) 词项
+        :inner_statement => P.seq(
+            :term, :ws,
+            :copula, :ws, # 只实现一般形式，合法性限定留给「构造方法の合法性检查」
+            :term, :ws,
+        ),
+        # 陈述
+        :statement => P.first(
+            # 正常的「尖括号」形式：`<term copula term>`
+            :statement_angle => P.seq(
+                P_token(parser.compound_brackets[Statement][1]), :ws,
+                :inner_statement,
+                P_token(parser.compound_brackets[Statement][2]), :ws,
+            ),
+            # 「圆括号」形式（仿NARS-Python）：`(term copula term)`
+            :statement_round => P.seq(
+                P_token(parser.compound_brackets[Compound][1]), :ws,
+                :inner_statement,
+                P_token(parser.compound_brackets[Compound][2]), :ws,
+            ),
+            # 类似「函数调用」的`操作(词项...)` => `(*, ⇑操作, 词项...)` 形式
+            :statement_ocall => P.seq(
+                :identifier, :ws,
+                P_token(parser.compound_brackets[Compound][1]), :ws,
+                :inner_compound, :ws,
+                P_one(:compound_separator), :ws, # 「尾后逗号」
+                P_token(parser.compound_brackets[Compound][2]), :ws,
+            ),
+            # 🆕简略的「无括号」形式：`term copula term`
+            :statement_inline => P.seq(
+                P.not_followed_by( # 不能在识别到前面的情况时，再搞一个嵌套「<<A-->B>>」出来
+                    P.first(
+                        P_token(parser.compound_brackets[Compound][1]),
+                        P_token(parser.compound_brackets[Statement][1]),
+                    )
+                ),
+                :inner_statement,
+            ),
+        ),
+        :copula => P.first(
+            # 主系词
+            :inheritance               => P_token(parser.copula_dict[STInheritance]),
+            :similarity                => P_token(parser.copula_dict[STSimilarity]),
+            :implication               => P_token(parser.copula_dict[STImplication]),
+            :equivalence               => P_token(parser.copula_dict[STEquivalence]),
+            # 副系词
+            :instance                  => P_token(parser.copula_dict[STInstance]),
+            :property                  => P_token(parser.copula_dict[STProperty]),
+            :instance_property          => P_token(parser.copula_dict[STInstanceProperty]),
+            # 时序蕴含/等价
+            :predictive_implication        => P_token(parser.copula_dict[STImplicationPredictive]),
+            :concurrent_implication        => P_token(parser.copula_dict[STImplicationConcurrent]),
+            :retrospective_implication     => P_token(parser.copula_dict[STImplicationRetrospective]),
+            :predictive_equivalence        => P_token(parser.copula_dict[STEquivalencePredictive]),
+            :concurrent_equivalence        => P_token(parser.copula_dict[STEquivalenceConcurrent]),
+            :retrospective_equivalence     => P_token(parser.copula_dict[STEquivalenceRetrospective]), # 此「重定向行为」留给「数据类型构造」阶段，最大化减少语法复杂度/非对称性
+        ),
+    )
 
     "默认的语法转换器"
     const NARSESE_DEFAULT_FOLDS::Dict = Dict(
@@ -601,11 +599,11 @@ begin "Pika部分"
         # 数值
         :uint            => (str, subvals) -> JuNarsese.parse_default_uint(str),
         :unsigned_number => (str, subvals) -> JuNarsese.parse_default_float(str),
-        #= 任务(WIP) =#
-        # subvals结构：[预算值] 语句
-        # :task   => (str, subvals) -> (@info "support of task is still WIP!" str subvals), # JuNarsese.Task(...),
+        #= 任务 =#
+        # subvals结构：**预算值** 空白 **语句** ...
+        :task   => (str, subvals) -> JuNarsese.TaskBasic(subvals[3], subvals[1]),
         # subvals结构：括弧 空白 **无符号数** 空白[分隔符 空白 **无符号数** 空白]+ 括弧 空白
-        # :budget => (str, subvals) -> (@info "support of budget is still WIP!" str subvals), # JuNarsese.Budget(...),
+        :budget => (str, subvals) -> JuNarsese.default_precision_budget(subvals[3:4:end]...),
         #= 语句 =#
         # 语句 subvals结构：**词项** 空白 **标点(构造器)** 空白 时间戳 空白 真值 空白
         :sentence => (str, subvals) -> subvals[3](
@@ -619,7 +617,7 @@ begin "Pika部分"
         :punct_goal      => (str, subvals) -> JuNarsese.SentenceGoal,
         :punct_quest     => (str, subvals) -> JuNarsese.SentenceQuest,
         # 真值 subvals结构：括弧 空白 **无符号数** 空白[分隔符 空白 **无符号数** 空白]+ 括弧 空白
-        :truth_valued => (str, subvals) -> JuNarsese.Truth(subvals[3], subvals[5]), # 【20230818 23:52:38】不知为何第四个的空白符被省掉了。。。
+        :truth_valued => (str, subvals) -> JuNarsese.default_precision_truth(subvals[3], subvals[5]), # 【20230818 23:52:38】不知为何第四个的空白符被省掉了。。。
         :truth_default => (str, subvals) -> JuNarsese.default_precision_truth(), # 不知为何就是不起效：`P.epsilon`似乎没法直接识别
         # 固定时态时间戳：直接返回相应的「基础时间戳」
         :stamp_past    => (str, subvals) -> JuNarsese.StampBasic{Past}(),
@@ -710,39 +708,6 @@ begin "Pika部分"
         # show && @info "nothing default_fold!" str subvals nothing
     end
 
-    #= WIP: 对标PyNARS，实现其「中缀复合词项」部分
-    ?multi : "(" con_multi "," term ("," term)+ ")" -> multi_prefix                                 // 前缀算符
-        | "(" multi_infix_expr ")"                                                                  // 中缀算符
-        | "(" term ("," term)+ ")"                                  -> multi_prefix_product         // 乘积的「，」形式
-        | "(" con_product "," term ("," term)* ")"                  -> multi_prefix                 // 乘积的前缀形式
-
-    ?single : "(" con_single "," (term|multi_infix_expr) "," (term|multi_infix_expr) ")"  -> single_prefix  // 前缀形式
-        | "(" (term|multi_infix_expr) con_single (term|multi_infix_expr) ")"          -> single_infix       // 中缀形式
-
-    ?multi_infix_expr : multi_extint_expr
-        | multi_intint_expr
-        | multi_parallel_expr
-        | multi_sequential_expr
-        | multi_conj_expr
-        | multi_disj_expr
-        | multi_prod_expr
-
-    // precedence 运算优先级:
-    //  "&" > "|" > "&|" > "&/" >  "&&" > "||" > "*"
-    ?multi_prod_expr : term6 ("*" term6)+
-    ?term6 : (term5|multi_disj_expr)
-    ?multi_disj_expr: term5 ("||" term5)+
-    ?term5 : (term4|multi_conj_expr)
-    ?multi_conj_expr: term4 ("&&" term4)+
-    ?term4 : (term3|multi_sequential_expr)
-    ?multi_sequential_expr: term3 ("&/" term3)+
-    ?term3 : (term2|multi_parallel_expr)
-    ?multi_parallel_expr: term2 ("&|" term2)+
-    ?term2 : (term1|multi_intint_expr)
-    ?multi_intint_expr : term1 ("|" term1)+
-    ?term1 : (term|multi_extint_expr)
-    ?multi_extint_expr : term ("&" term)+
-    =#
 end
 
 begin "JuNarsese部分"

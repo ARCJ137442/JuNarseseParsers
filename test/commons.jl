@@ -15,7 +15,11 @@ if !isdefined(Main, :JuNarsese)
     using JuNarsese.Util # 特别using其中的「Util」
 end
 begin "报错debug专用"
-    # LarkParser_alpha("<A --> +123>. :!123: %1.0;0.9%")
+    # @show CommonCompound{CompoundTypeTermLogicalSet{Intension, Or}}()
+    # @show nse"$0.5;0.5;0.5$ <A-->B>."
+    # @show nse"<$A-->$B>." # 预算值不能匹配到独立变量的「$」
+    # @show nse"预0.5、0.8、0.1算「我是墓地」。"han
+    # @show nse"「我是墓地」。"han
 end
 if !isdefined(Main, :Test)
     using Test
@@ -45,7 +49,7 @@ if !isdefined(Main, :Test)
     @show s3 = ShortcutParser(
         """ (( q"A" * i"B" ) → o"C" ) ⇔ (d"D" ↔ (w"E" * n"12")) """
     )
-    # 顺序合取
+    # 时序合取
     @show s4 = ∨(⩜(A→B, B→C, C→D), ⩚(A→B, B→C, C→D)) ⇒ (A→D)
     # 副系词|时序蕴含/等价
     s5 = ParConjunction([
@@ -76,32 +80,42 @@ if !isdefined(Main, :Test)
     ) → t2) ⇔ (s4 ⇒ s2)
     @show s6
 
-    terms = [w, i, d, q, o, t1, s1, s2, s3, t2, t3, s4, s5, s6]
+    terms::Vector{AbstractTerm} = [w, i, d, q, o, t1, s1, s2, s3, t2, t3, s4, s5, s6]
     @info "terms: " terms
 
     # 构建
-    sentences = [
+    sentences::Vector{AbstractSentence} = [
         narsese"<A-->B>. :|: %1.00;0.90%"
         narsese"<SELF {-] good>! :|: "
         narsese"<<(*, A, B) --> (*, C, D)> ==> (&&, <A --> C>, <B --> D>)>@ %1.00;0.90%"
         narsese"<(*, A, B, C, D) --> R>? "
         narsese"<BALL {-] left>. :!132:"
         nse"「我是墓地」。现在真值=1.0真0.5信"han
-        nse"「「他是『爱因斯坦』」得「他似爱因斯坦」」"han
+        nse"「「他是『爱因斯坦』」得「他似爱因斯坦」」。"han
         nse"「（与，「凉白开是水」，「水是有毒的」）得「凉白开是有毒的」」将来真值=0.8真0.3信"han
         nse"「「（积，甲，乙）是（积，丙，丁）」将得（与，「甲是丙」，「乙是丁」）」？"han
         nse"「「（积，『爱因斯坦』，专利局）是坐在」曾得「（外像，『爱因斯坦』，坐在，某）是专利局」」曾经真值=0.5真0.9信"han
         nse"「（积，「『我』是【好】」）似（积，「我为【好】」，「『我』有好」，「我具有好」）」；"han
-        nse"「（外交，【词项，任一独立变量，其一非独变量】，【所问查询变量，操作操作】）似【词项，任一独立变量，其一非独变量，所问查询变量，操作操作】」"han
+        nse"「（外交，【词项，任一独立变量，其一非独变量】，【所问查询变量，操作操作】）似【词项，任一独立变量，其一非独变量，所问查询变量，操作操作】」？"han
         nse"「（内交，【词项，任一独立变量，其一非独变量，所问查询变量】，【所问查询变量，操作操作】）似【所问查询变量】」。时刻=42"han
-        nse"「（内差，【词项，任一独立变量，其一非独变量】，【词项】）似【任一独立变量，其一非独变量】」"han
+        nse"「（内差，【词项，任一独立变量，其一非独变量】，【词项】）似【任一独立变量，其一非独变量】」。"han
         nse"（与，「『爱因斯坦』是物理学家」，「（外像，某，研发出，相对论）是『爱因斯坦』」）。"han
         nse"「（与，「任一人是【会死的】」，「『苏格拉底』是人」）得「『苏格拉底』是【会死的】」」。"han
         nse"「（接连，「时间是黑夜」，「程序员有写代码」，「（外像，程序员，撞上，某）是bug」）将得「程序员是【熬夜的】」」。"han
         nse"「（同时，「系统有开放性」，「系统有自主性」，「系统有实时性」）将得「系统是AGI」」？"han
         SentenceJudgement(s6)
     ]
-    @info "sentences: " sentences
+
+    # 构建
+    tasks::Vector{AbstractTask} = [
+        narsese"$1.0;0.5;0.5$ <A-->B>. :|: %1.00;0.90%"
+        narsese"$0.5;0.5;0.5$ <SELF {-] good>! :|: "
+        narsese"$0.4;0.6;0.5$ <<(*, A, B) --> (*, C, D)> ==> (&&, <A --> C>, <B --> D>)>@ %1.00;0.90%"
+        narsese"$0.3;0.7;0.5$ <(*, A, B, C, D) --> R>? "
+        narsese"$0.2;0.8;0.5$ <BALL {-] left>. :!132:"
+        TaskBasic.(sentences)... # 所有语句转换为一个基本的任务
+    ]
+    @info "tasks: " tasks
     # 下面这些注释是利用系统报错精确获得堆栈信息/调试支持的
     # ASTParser.(ASTParser.(ASTParser.(sentences)))
     # XMLParser_optimized.(XMLParser_optimized.(XMLParser_optimized.(sentences)))
@@ -118,7 +132,7 @@ if !isdefined(Main, :Test)
     # @show sentences
 
     "标准测试集 = 词项 + 语句"
-    test_set::NamedTuple = (;terms, sentences) # 具名元组
+    test_set::NamedTuple = (;terms, sentences, tasks) # 具名元组
     # test_set = (;terms=[s7], sentences=[])
 
     "测试集：\n$test_set" |> println
