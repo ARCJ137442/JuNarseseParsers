@@ -17,7 +17,7 @@ const Bytes8::DataType = Vector{UInt8}
 "类型の短别名"
 const TSParser::Type = Type{S11nParser}
 
-"目标类型：词项/语句"
+"目标类型：Narsese对象"
 const S11N_PARSE_TARGETS::Type = Conversion.DEFAULT_PARSE_TARGETS
 Conversion.parse_target_types(::TSParser) = S11N_PARSE_TARGETS
 
@@ -29,7 +29,7 @@ Conversion.get_parser_from_flag(::Val{:s11n})::TAbstractParser = S11nParser
 
 # 正式开始 #
 
-# 具体词项对接
+# 具体Narsese对接
 
 """
 总「解析」方法：任意对象都可序列化
@@ -42,7 +42,7 @@ function data2narsese(::TSParser, ::Type, bytes::Bytes8)::S11N_PARSE_TARGETS
 end
 
 """
-所有词项的序列化方法
+所有Narsese对象的序列化方法
 """
 function narsese2data(::TSParser, t::S11N_PARSE_TARGETS)::Bytes8
     b::IOBuffer = IOBuffer()

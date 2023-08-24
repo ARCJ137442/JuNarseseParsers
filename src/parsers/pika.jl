@@ -881,7 +881,7 @@ begin "JuNarsese部分"
 
     """
     定义「Pika转换」的「目标类型」
-    - 字串↔词项/语句
+    - 字串↔Narsese对象
     """
     const PIKA_PARSE_TARGETS::Type = JuNarsese.Conversion.DEFAULT_PARSE_TARGETS
 

@@ -4,6 +4,9 @@
 # 外部呈现
 *.html
 
+# 日志
+*.log
+
 # 开发环境
 /.vscode
 /.dist

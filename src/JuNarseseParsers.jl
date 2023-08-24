@@ -20,8 +20,17 @@ export data2narsese, narsese2data
 # XML
 include("parsers/xml.jl")
 
+# S-表达式
+include("parsers/s_expr.jl")
+
 # JSON
 include("parsers/json.jl")
+
+# YAML
+include("parsers/yaml.jl")
+
+# TOML
+include("parsers/toml.jl")
 
 # 序列化
 include("parsers/serialization.jl")

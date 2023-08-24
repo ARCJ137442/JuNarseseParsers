@@ -24,7 +24,7 @@ begin "Lerche部分"
     const ORIGINAL_NARSESE_GRAMMAR::String = raw"""
 
     // 入口 迁移者注：此元素也可以通过parser中的「start」参数指定
-    ?start: task | sentence | term         // 迁移者注：此处转换成词项/语句，以示明晰（任务暂不使用）
+    ?start: task | sentence | term         // 迁移者注：此处转换成Narsese对象，以示明晰（任务暂不使用）
     
     // 基础类型
 
@@ -487,11 +487,11 @@ begin "JuNarsese部分"
 
     """
     定义「JSON转换」的「目标类型」
-    - JSON字串↔词项/语句
+    - JSON字串↔Narsese对象
     """
     const LARK_PARSE_TARGETS::Type = Conversion.DEFAULT_PARSE_TARGETS
 
-    "目标类型：词项/语句"
+    "目标类型：Narsese对象"
     Conversion.parse_target_types(::LarkParser) = LARK_PARSE_TARGETS
 
     "数据类型：以JSON表示的字符串"

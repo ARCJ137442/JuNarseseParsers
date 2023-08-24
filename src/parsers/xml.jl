@@ -15,7 +15,7 @@ export XMLParser, XMLParser_optimized, XMLParser_pure
 提供XML互转方法
 
 ## 初步实现方式
-- 词项↔AST↔XML
+- Narsese对象↔AST↔XML
 - 📄解析后XML内只有：
     - String(位于「文本」类型的XML.Node)
         - 这意味着Number、Symbol类型需先从String中解析
@@ -48,7 +48,7 @@ export XMLParser, XMLParser_optimized, XMLParser_pure
                 1. 类名::String = 标签==结构转义标签 ? 取type属性 : 标签
                 2. 类::Type = AST解析类名
                 3. 分派「特别方式」：调用「特别解析函数」
-                    - 用于「带优化模式」中词项、语句的优化
+                    - 用于「带优化模式」中Narsese对象的优化
                     - 同时存在
                 4. 若无分派（返回「被解析对象」自身）：获取头
                     - 头::Symbol = Symbol(类名)
@@ -246,7 +246,7 @@ const TXMLParser_pure::Type = Type{XMLParser_pure}
 """
 const XML_PARSE_TARGETS::Type = DEFAULT_PARSE_TARGETS
 
-"目标类型：词项/语句"
+"目标类型：Narsese对象"
 Conversion.parse_target_types(::TXMLParser) = XML_PARSE_TARGETS
 
 """
