@@ -37,11 +37,15 @@ const TSExprParser::Type = Type{<:SExprParser}
 const SExprParser_pure::TSExprParser = SExprParser{Dict}
 const SExprParser_optimized::TSExprParser = SExprParser{Vector}
 
-"重载「字符串宏の快捷方式」:s" # 默认带优化
-Conversion.get_parser_from_flag(::Val{:s})::TAbstractParser = SExprParser_optimized
-
-"重载「字符串宏の快捷方式」:s_pure"
-Conversion.get_parser_from_flag(::Val{:s_pure})::TAbstractParser = SExprParser_pure
+# 重载「字符串宏の快捷方式」
+@register_parser_string_flag [
+    :s => SExprParser_optimized
+    :s_o => SExprParser_optimized
+    :s_optimized => SExprParser_optimized
+    
+    :s_pure => SExprParser_pure
+    :s_p => SExprParser_pure
+]
 
 """
 定义「SExpr转换」的「目标类型」

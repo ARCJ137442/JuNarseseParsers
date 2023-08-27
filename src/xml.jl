@@ -228,14 +228,14 @@ const XMLParser_optimized::Type = XMLParser # 不带参数类
 "纯翻译：纯粹地将AST直译成XML"
 const XMLParser_pure::Type = XMLParser{Dict} # 带参数类Dict
 
-"重载「字符串宏の快捷方式」:xml"
-Conversion.get_parser_from_flag(::Val{:xml})::TAbstractParser = XMLParser
-
-"重载「字符串宏の快捷方式」:xml_optimized"
-Conversion.get_parser_from_flag(::Val{:xml_optimized})::TAbstractParser = XMLParser_optimized
-
-"重载「字符串宏の快捷方式」:xml_puret"
-Conversion.get_parser_from_flag(::Val{:xml_pure})::TAbstractParser = XMLParser_pure
+# 重载「字符串宏の快捷方式」
+@register_parser_string_flag [
+    :xml => XMLParser
+    :xml_optimized => XMLParser_optimized
+    :xml_o => XMLParser_optimized
+    :xml_pure => XMLParser_pure
+    :xml_p => XMLParser_pure
+]
 
 const TXMLParser_optimized::Type = Type{XMLParser_optimized} # 仅一个Type
 const TXMLParser_pure::Type = Type{XMLParser_pure}

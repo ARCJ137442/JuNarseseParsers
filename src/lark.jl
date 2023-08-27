@@ -497,8 +497,8 @@ begin "JuNarsese部分"
     "数据类型：以JSON表示的字符串"
     Base.eltype(::LarkParser)::Type = String
 
-    "重载「字符串宏の快捷方式」:lark"
-    Conversion.get_parser_from_flag(::Val{:lark})::TAbstractParser = LarkParser_alpha
+    # 重载「字符串宏の快捷方式」:lark
+    @register_parser_string_flag :lark => LarkParser_alpha
 
     # 字符串显示
     @redirect_SRS parser::LarkParser parser.name

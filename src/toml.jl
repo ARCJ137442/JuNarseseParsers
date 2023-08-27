@@ -33,8 +33,10 @@ abstract type TOMLParser <: AbstractParser end
 "转换器の类型"
 const TTOMLParser::Type = Type{<:TOMLParser}
 
-"重载「字符串宏の快捷方式」:toml"
-Conversion.get_parser_from_flag(::Val{:toml})::TAbstractParser = TOMLParser
+# 重载「字符串宏の快捷方式」
+@register_parser_string_flag [
+    :toml => TOMLParser
+]
 
 """
 定义「TOML转换」的「目标类型」

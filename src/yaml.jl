@@ -48,8 +48,11 @@ const YAML_PARSER_DICT::Dict = Dict(
     YAMLParser_vector => NativeParser_vector,
 )
 
-"重载「字符串宏の快捷方式」:yaml"
-Conversion.get_parser_from_flag(::Val{:yaml})::TAbstractParser = YAMLParser
+# 重载「字符串宏の快捷方式」
+@register_parser_string_flag [
+    :yaml => YAMLParser
+    :yml  => YAMLParser
+]
 
 """
 定义「YAML转换」的「目标类型」

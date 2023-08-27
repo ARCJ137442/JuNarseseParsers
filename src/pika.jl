@@ -933,10 +933,12 @@ begin "JuNarsese部分"
         start = :top
     )
 
-    "重载「字符串宏の快捷方式」`:pika`⇒`PikaParser_alpha`"
-    Conversion.get_parser_from_flag(::Val{:pika})::TAbstractParser = PikaParser_alpha
-    Conversion.get_parser_from_flag(::Val{:pika_alpha})::TAbstractParser = PikaParser_alpha
-    Conversion.get_parser_from_flag(::Val{:pika_α})::TAbstractParser = PikaParser_alpha
+    # 重载「字符串宏の快捷方式」`:pika`⇒`PikaParser_alpha`
+    @register_parser_string_flag [
+        :pika => PikaParser_alpha
+        :pika_alpha => PikaParser_alpha
+        :pika_α => PikaParser_alpha
+    ]
 
     # 遍历预置字符串解析器，借用原生解析器生成相应的PikaParser版本
     for (symbol::Symbol, parser::JuNarsese.Conversion.StringParser) in JuNarsese.Conversion.PRESET_STRING_PARSERS
