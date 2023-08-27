@@ -18,27 +18,27 @@ export data2narsese, narsese2data
 # 导入各个文件 #
 
 # XML
-include("parsers/xml.jl")
+include("xml.jl")
 
 # S-表达式
-include("parsers/s_expr.jl")
+include("s_expr.jl")
 
 # JSON
-include("parsers/json.jl")
+include("json.jl")
 
 # YAML
-include("parsers/yaml.jl")
+include("yaml.jl")
 
 # TOML
-include("parsers/toml.jl")
+include("toml.jl")
 
 # 序列化
-include("parsers/serialization.jl")
+include("serialization.jl")
 
 # Lerche(Lark)
-include("parsers/lark.jl")
+include("lark.jl")
 
 # Pika(PikaParser)
-include("parsers/pika.jl")
+include("pika.jl")
 
 end # module

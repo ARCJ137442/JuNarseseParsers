@@ -4,7 +4,7 @@ import PikaParser as P
 # 导出
 
 export PikaParser
-export PikaParser_alpha, PikaParser_ascii, PikaParser_latex, PikaParser_han
+export PikaParser_alpha#, PikaParser_ascii, PikaParser_latex, PikaParser_han # 后三者在单独的定义中导出
 
 
 begin "Pika部分"
@@ -933,40 +933,34 @@ begin "JuNarsese部分"
         start = :top
     )
 
-    "借用原生字符串解析器"
-    const PikaParser_ascii::PikaParser = PikaParser(
-        "PikaParser_ascii",
-        Conversion.StringParser_ascii,
-        NARSESE_DEFAULT_FOLDS;
-        start = :top
-    )
-
-    "借用原生LaTeX解析器"
-    const PikaParser_latex::PikaParser = PikaParser(
-        "PikaParser_latex",
-        Conversion.StringParser_latex,
-        NARSESE_DEFAULT_FOLDS;
-        start = :top
-    )
-
-    "借用原生漢文解析器"
-    const PikaParser_han::PikaParser = PikaParser(
-        "PikaParser_han",
-        Conversion.StringParser_han,
-        NARSESE_DEFAULT_FOLDS;
-        start = :top
-    )
-
     "重载「字符串宏の快捷方式」`:pika`⇒`PikaParser_alpha`"
     Conversion.get_parser_from_flag(::Val{:pika})::TAbstractParser = PikaParser_alpha
     Conversion.get_parser_from_flag(::Val{:pika_alpha})::TAbstractParser = PikaParser_alpha
     Conversion.get_parser_from_flag(::Val{:pika_α})::TAbstractParser = PikaParser_alpha
-    
-    # 重载「字符串宏の快捷方式」`:pika_XXX`⇒`PikaParser_XXX`
-    for symbol in (:ascii, :latex, :han)
-        Conversion.get_parser_from_flag(::Val{Symbol(:pika_, symbol)})::TAbstractParser = eval(
-            Symbol("PikaParser_" * string(symbol))
-        )
-    end
 
+    # 遍历预置字符串解析器，借用原生解析器生成相应的PikaParser版本
+    for (symbol::Symbol, parser::JuNarsese.Conversion.StringParser) in JuNarsese.Conversion.PRESET_STRING_PARSERS
+        local parser_name::String = "PikaParser_$symbol"
+        local parser_name_symbol::Symbol = Symbol(parser_name)
+        local parser_symbol::QuoteNode = QuoteNode(Symbol(:pika_, symbol)) # 确保插入后还是一个符号
+
+        quote
+            # 生成解析器
+            "重载`$($parser)`产生的`$($parser_name)`"
+            const $(parser_name_symbol)::PikaParser = PikaParser(
+                $parser_name,
+                $parser,
+                NARSESE_DEFAULT_FOLDS;
+                start = :top
+            )
+            
+            # 重载「字符串宏の快捷方式」`:pika_XXX`⇒`PikaParser_XXX`
+            Conversion.get_parser_from_flag(::Val{$parser_symbol})::TAbstractParser = PikaParser_$symbol
+
+            # 导出
+            export $parser_name_symbol
+
+        end |> eval
+    end
+    
 end
