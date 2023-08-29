@@ -16,19 +16,28 @@
 
 JuNarseseParsers
 
-1. 扩展了JuNarsese的解析器，支持多种表示形式
+1. 在字符串解析器中，使用多种文法描述Narsese，对接多种文法库：
+    - 基于 *EBNF* 的[**Lerche**](https://github.com/jamesrhester/Lerche.jl)(`LarkParser_alpha`)
+    - 基于 *PEG* 的[**PikaParser**](https://github.com/LCSB-BioCore/PikaParser.jl)
+      - 总体上支持更宽松的Narsese语法，例如：
+        - 函数计算形式的操作复合词项表示：`op(x, y)`（[CommonNarsese](https://github.com/ARCJ137442/JuNarsese.jl#commonnarsese)：`(*, ^op, x, y)`）
+        - 🆕无需陈述括弧的语句表示：`水是流体。`（漢文版本；[CommonNarsese](https://github.com/ARCJ137442/JuNarsese.jl#commonnarsese)：`<水 --> 流体>.`）
+      - 多种解析器子类型：
+        - Alpha解析器(`PikaParser_alpha`)
+          - 第一个使用纯PikaParser规则构建的解析器
+          - 语法兼容默认的[CommonNarsese](https://github.com/ARCJ137442/JuNarsese.jl#commonnarsese)解析器
+          - 可能包含一些最新的解析器特性
+            - 如：任意空白符分割
+        - 从字符串解析器`StringParser`中迁移的解析器副本
+          - 如「`StringParser_ascii`」⇒「`PikaParser_ascii`」
+2. 扩展了JuNarsese的解析器，支持多种表示形式
     - 基于JuNarsese内置的「原生对象解析器」：
-      - **[JSON](https://www.json.org/)**：数组/对象 两种模式（后者为默认）
-      - **[XML](https://www.xml.com/)**：纯翻译/带优化 两种模式（后者为默认）
-      - **[S-Expr](https://zh.wikipedia.org/wiki/S-表达式)**：类Lisp风格的表达式体系
-      - **[YAML](https://yaml.org)**：数组/对象 两种模式（后者为默认）
-      - **[TOML](https://toml.io)**：仅「数组」单一模式
-    - **序列化**：对接Julia自带的序列化系统
-2. 在字符串解析器中，使用多种文法描述Narsese，对接多种外部解析器：
-    - 基于EBNF文法的[Lerche](https://github.com/jamesrhester/Lerche.jl)
-    - 基于PEG文法的[PikaParser](https://github.com/LCSB-BioCore/PikaParser.jl)
-3. （相应地）使JuNarsese更轻量化、可扩展
-    - 后者不再依赖`JSON`、`XML`、`Serialization`库
+      - **[JSON](https://www.json.org/)**(`JSONParser`)：数组/对象 两种模式（后者为默认）
+      - **[XML](https://www.xml.com/)**(`XMLParser`)：纯翻译/带优化 两种模式（后者为默认）
+      - **[S-Expr](https://zh.wikipedia.org/wiki/S-表达式)**(`SExprParser`)：类Lisp风格的表达式体系
+      - **[YAML](https://yaml.org)**(`YAMLParser`)：数组/对象 两种模式（后者为默认）
+      - **[TOML](https://toml.io)**(`TOMLParser`)：仅「数组」单一模式
+    - **序列化**(`S11nParser`)：对接Julia自带的序列化系统
 
 ## 参考
 
