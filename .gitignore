@@ -1,12 +1,15 @@
 # 内部测试文件
 \[test\]*
 
-# 外部呈现
-*.html
-
 # 日志
 *.log
 
 # 开发环境
 /.vscode
 /.dist
+
+# 构建、导出后文件
+*.exe
+*.pdf
+*.zip
+*.html
