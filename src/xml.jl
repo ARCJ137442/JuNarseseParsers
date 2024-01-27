@@ -591,7 +591,7 @@ begin "解析の逻辑"
     )
 
     """
-    特别解析@带优化：节点⇒真值
+    特别解析@带优化：节点⇒双真值（默认）
     """
     function xml_parse_special(::TXMLParser_optimized, ::Type{T}, n::XML.Node)::Truth where {T <: Truth}
         type::DataType = parse_node_type(n, Narsese.eval) # 获得类型
@@ -602,16 +602,54 @@ begin "解析の逻辑"
         # 构造
         return type(f, c)
     end
+
+    """
+    特别解析@带优化：节点⇒空真值
+    - 直接返回单例`truth_null`
+    """
+    xml_parse_special(::TXMLParser_optimized, ::Type{TruthNull}, n::XML.Node)::Truth = truth_null
+
+    """
+    特别解析@带优化：节点⇒单真值
+    """
+    function xml_parse_special(::TXMLParser_optimized, ::Type{T}, n::XML.Node)::Truth where {T <: TruthSingle}
+        type::DataType = parse_node_type(n, Narsese.eval) # 获得类型
+        # 解析其中的f、c值：从类名中获得精度信息
+        f_str::String = n.attributes["f"]
+        f_type::Type = type.types # 获取所有类型参数（一定是两个参数，不受别名影响）
+        f::f_type = parse(f_type, f_str)
+        # 构造
+        return type(f)
+    end
     
     """
-    预打包：真值⇒XML节点
-    - 示例：`%1.0;0.5%` ⇒ `<Truth16 f="1.0", c="0.5"/>`
+    预打包：双真值⇒XML节点（默认）
+    - 示例：`%1.0;0.5%` ⇒ `<Truth16 f="1.0"/>`
     """
     @inline xml_pack(::TXMLParser_optimized, t::Truth)::XML.Node = xml_form_struct(
         Conversion.pack_type_string(t), # 词项类型⇒元素标签
         ( # 属性：f、c
             f = string(get_f(t)),
             c = string(get_c(t)),
+        ),
+    )
+    
+    """
+    预打包：空真值⇒XML节点
+    - 示例：`` ⇒ `<TruthNull/>`
+    """
+    @inline xml_pack(::TXMLParser_optimized, t::TruthNull)::XML.Node = xml_form_struct(
+        Conversion.pack_type_string(t), # 词项类型⇒元素标签
+    )
+    
+    """
+    预打包：单真值⇒XML节点
+    - 示例：`%1.0;0.5%` ⇒ `<Truth16 f="1.0"/>`
+    """
+    @inline xml_pack(::TXMLParser_optimized, t::TruthSingle)::XML.Node = xml_form_struct(
+        Conversion.pack_type_string(t), # 词项类型⇒元素标签
+        ( # 属性：f
+            f = string(get_f(t)),
         ),
     )
 
