@@ -13,3 +13,6 @@
 *.pdf
 *.zip
 *.html
+
+# 本地化配置
+Manifest.toml
