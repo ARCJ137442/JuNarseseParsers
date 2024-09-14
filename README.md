@@ -1,14 +1,24 @@
 # JuNarsese Parsers
 
-**简体中文** | [English](https://github.com/ARCJ137442/JuNarseseParsers.jl/blob/main/README-en.md)
+|**简体中文** | [English](README-en.md)|
+|:---:|:---:|
 
-[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
-[![Static Badge](https://img.shields.io/badge/julia-package?logo=julia&label=1.8%2B)](https://julialang.org/)
+![GitHub License](https://img.shields.io/github/license/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge&color=a270ba)
+![Code Size](https://img.shields.io/github/languages/code-size/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge&color=a270ba)
+![Lines of Code](https://www.aschey.tech/tokei/github.com/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge&color=a270ba)
+[![Language](https://img.shields.io/badge/language-Julia%201.8+-purple?style=for-the-badge&color=a270ba)](https://cn.julialang.org/)
 
-[![CI status](https://github.com/ARCJ137442/JuNarseseParsers.jl/workflows/CI/badge.svg)](https://github.com/ARCJ137442/JuNarseseParsers.jl/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/ARCJ137442/JuNarseseParsers.jl/graph/badge.svg?token=3FF26Y3YJG)](https://codecov.io/gh/ARCJ137442/JuNarseseParsers.jl)
+开发状态：
 
-该项目使用[语义化版本 2.0.0](https://semver.org/)进行版本号管理。
+[![CI status](https://img.shields.io/github/actions/workflow/status/ARCJ137442/JuNarseseParsers.jl/ci.yml?style=for-the-badge)](https://github.com/ARCJ137442/JuNarseseParsers.jl/actions/workflows/ci.yml)
+[![Codecov](https://img.shields.io/codecov/c/github/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge)](https://codecov.io/gh/ARCJ137442/JuNarseseParsers.jl)
+
+![Created At](https://img.shields.io/github/created-at/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge)
+![Last Commit](https://img.shields.io/github/last-commit/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge)
+
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-2.0.0-%23FE5196?style=for-the-badge)](https://conventionalcommits.org)
+
+## 简介
 
 [**JuNarsese**](https://github.com/ARCJ137442/JuNarsese.jl)的解析器**扩展**
 

@@ -1,14 +1,26 @@
 # JuNarsese Parsers
 
-[简体中文](https://github.com/ARCJ137442/JuNarseseParsers.jl/blob/main/README.md) | **English**
+|[简体中文](README.md) | **English**|
+|:---:|:---:|
 
-[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
-[![Static Badge](https://img.shields.io/badge/julia-package?logo=julia&label=1.8%2B)](https://julialang.org/)
+![GitHub License](https://img.shields.io/github/license/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge&color=a270ba)
+![Code Size](https://img.shields.io/github/languages/code-size/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge&color=a270ba)
+![Lines of Code](https://www.aschey.tech/tokei/github.com/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge&color=a270ba)
+[![Language](https://img.shields.io/badge/language-Julia%201.8+-purple?style=for-the-badge&color=a270ba)](https://julialang.org/)
 
-[![CI status](https://github.com/ARCJ137442/JuNarseseParsers.jl/workflows/CI/badge.svg)](https://github.com/ARCJ137442/JuNarseseParsers.jl/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/ARCJ137442/JuNarseseParsers.jl/graph/badge.svg?token=3FF26Y3YJG)](https://codecov.io/gh/ARCJ137442/JuNarseseParsers.jl)
+开发状态：
 
-This project uses [Semantic Versioning 2.0.0](https://semver.org/) for version management.
+[![CI status](https://img.shields.io/github/actions/workflow/status/ARCJ137442/JuNarseseParsers.jl/ci.yml?style=for-the-badge)](https://github.com/ARCJ137442/JuNarseseParsers.jl/actions/workflows/ci.yml)
+[![Codecov](https://img.shields.io/codecov/c/github/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge)](https://codecov.io/gh/ARCJ137442/JuNarseseParsers.jl)
+
+![Created At](https://img.shields.io/github/created-at/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge)
+![Last Commit](https://img.shields.io/github/last-commit/ARCJ137442/JuNarseseParsers.jl?style=for-the-badge)
+
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-2.0.0-%23FE5196?style=for-the-badge)](https://conventionalcommits.org)
+
+## Introduction
+
+Parser extensions for [**JuNarsese**](https://github.com/ARCJ137442/JuNarsese.jl)
 
 ## Overview
 
